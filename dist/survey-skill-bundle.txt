@@ -1,6 +1,6 @@
 ===============================================================================
 # survey-skill single-file bundle
-# generated 2026-10-26T18:11:57Z from commit 528b4f6
+# generated 2026-10-26T18:30:14Z from commit b94bd91
 # 10 files. Sections start with: FILE: <path>
 ===============================================================================
 FILE: README.md
@@ -15,6 +15,11 @@ New to this? Start with the plain-language guide in
 [`instructions/`](instructions/guide.md): what the sample
 surveys do, how to import them and how to switch on sign-in. Common questions
 are answered in the [FAQ](instructions/FAQ.md). Indicative screenshots in [`screenshots/`](screenshots/).
+
+## Quick start
+1. Use or upload the distribution file [dist/survey-skill-bundle.txt](dist/survey-skill-bundle.txt) to your AI web service or harness and describe what survey you want
+2. Import the survey into Qualtrics
+3. If SSO is needed, reselect the SSO type to Shibboleth as described in [FAQ](instructions/FAQ.md#Shibboleth)
 
 ## Layout
 
@@ -54,10 +59,12 @@ the connection, save and publish.
 
 ## Install the skill
 
-Copy or symlink `skills/survey-qsf/` into your agent's skills folder,
-e.g. for pi:
+Clone the repo, then copy or symlink `skills/survey-qsf/` into your agent's
+skills folder, e.g. for [pi](https://pi.dev/):
 
 ```sh
+git clone https://github.com/all-hands/survey-skill.git
+cd survey-skill
 ln -s "$PWD/skills/survey-qsf" ~/.pi/agent/skills/survey-qsf
 ```
 
@@ -87,7 +94,7 @@ connection's token key. Keep real exports out of this repo: `exports/` and
 ## Made with AI
 
 The initial skill, validator, tests, sample surveys and guide in this repo were
-created with open-weight AI models.
+created with open-weight AI models. Final polishing was made with a mix of open- and closed-weight models.
 
 ## License and trademarks
 
@@ -488,7 +495,7 @@ score to each response; it doesn't stop any participant taking the survey. To
 switch it off anyway: **Survey options › Security › Bot detection**,
 then **Publish**. The live link keeps the old setting until you publish.
 
-### After importing a sample, the link says "Error while determining which SSO connection to use". How do I fix it?
+### After importing a sample, the link says "Error while determining which SSO connection to use". How do I fix it? ([Shibboleth](#Shibboleth))
 
 The sample file only holds a placeholder connection, and the editor can
 show your connection without actually saving it. This fix worked:
