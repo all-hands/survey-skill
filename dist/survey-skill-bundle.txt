@@ -1,0 +1,3684 @@
+===============================================================================
+# survey-skill single-file bundle
+# generated 2026-10-26T18:11:57Z from commit 528b4f6
+# 10 files. Sections start with: FILE: <path>
+===============================================================================
+FILE: README.md
+===============================================================================
+# survey-skill
+
+An agent skill for Qualtrics® `.qsf` survey files, focused on the quirks:
+what real exports contain, what breaks silently, how SSO behaves. It
+assumes a frontier model that already knows the QSF basics.
+
+New to this? Start with the plain-language guide in
+[`instructions/`](instructions/guide.md): what the sample
+surveys do, how to import them and how to switch on sign-in. Common questions
+are answered in the [FAQ](instructions/FAQ.md). Indicative screenshots in [`screenshots/`](screenshots/).
+
+## Layout
+
+```
+Makefile                       shortcuts: make validate | test | bundle | clean
+skills/survey-qsf/
+  SKILL.md                     the skill: modes, export quirks, recompute list, SSO essentials
+  references/sso.md            authenticator shape, placement, failure modes, diagnosis
+  references/feature-shapes.md copy-ready JSON for branches, embedded data, ranking, validation, JS/CSS
+  scripts/validate_qsf.py      structural validator (stdlib); --fresh for generated files
+  samples/                     three anonymized sample surveys, each with an SSO authenticator
+tests/test_validate_qsf.py     validator + sample tests
+scripts/
+  make_bundle.sh              one-file bundle of all docs + validator + samples (for AI web uploads)
+instructions/                  plain-language guide: import the samples, set up sign-in
+  guide.md                     the guide
+  FAQ.md                       common questions
+screenshots/                   screenshots of the steps in the guide
+```
+
+## Samples
+
+| File | What it is |
+|---|---|
+| `session-availability-sso.qsf` | Sign in, then mark each of 8 one-hour slots as no / remote / on site / either |
+| `ranked-preferences-sso.qsf` | Sign in, opt in, pick exactly 3 of 10 options, drag them into rank order, comment |
+| `event-attendance-sso.qsf` | Sign up via SSO or manually, RSVP yes / no, add the event to a calendar (Google/Outlook links, `.ics` download) |
+
+All three show a Qualtrics page before the authenticator and carry placeholder
+SSO values (`ASC_XXXXXXXXXXXXXXX`, key `XXXXXXXXXXXXXXXX`). After import
+(new project → Survey → *Import a QSF file*), open Survey flow, select your
+brand's SSO connection in the authenticator, publish, and test on the
+anonymous link (SSO is unreliable in preview). If the link says "Error
+while determining which SSO connection to use", the selection was not
+stored: switch SSO Type to another value, save, switch back, re-select
+the connection, save and publish.
+
+## Install the skill
+
+Copy or symlink `skills/survey-qsf/` into your agent's skills folder,
+e.g. for pi:
+
+```sh
+ln -s "$PWD/skills/survey-qsf" ~/.pi/agent/skills/survey-qsf
+```
+
+## Validate and test
+
+```sh
+python3 skills/survey-qsf/scripts/validate_qsf.py skills/survey-qsf/samples/*.qsf --fresh
+python3 -m unittest discover -s tests
+```
+
+With `make`: `make validate`, `make test`, `make bundle` (one-file bundle for
+AI services that accept a single upload), `make clean` — wrappers for the
+commands above.
+
+One test scans every tracked text file for the words in
+`tests/forbidden_terms.txt` (one regex per line, git-ignored, so it is not
+in a fresh clone). Without that file the test fails. To run the tests
+without it, set `SURVEY_SKILL_NO_TERMS=1`. Images are not scanned: check
+screenshots by eye.
+
+## Real exports are secrets
+
+A `.qsf` exported from a survey with an SSO authenticator embeds the SSO
+connection's token key. Keep real exports out of this repo: `exports/` and
+`*.private.qsf` are git-ignored for that.
+
+## Made with AI
+
+The initial skill, validator, tests, sample surveys and guide in this repo were
+created with open-weight AI models.
+
+## License and trademarks
+
+MIT, see `LICENSE`. Qualtrics is a registered trademark of Qualtrics, LLC.
+This project is not affiliated with or endorsed by Qualtrics and was made to facilitate survey design.
+
+===============================================================================
+FILE: instructions/guide.md
+===============================================================================
+# Ready-made Qualtrics surveys with sign-in: a plain guide
+
+## In short
+
+**What it is.** Three example surveys you can load into Qualtrics, plus
+written guidance for the colleague or AI assistant who builds surveys
+for you.
+
+**Who it is for.** Anyone who runs surveys in Qualtrics through the web
+page and wants to know who answered, without asking participants to type their
+name.
+
+**What you get.** Each example asks participants to sign in with their work
+account first. Their name, email and ID then land in your results by
+themselves. No typing, no typos.
+
+No technical knowledge needed. A few words come back often:
+
+- **QSF file**: one file that holds a whole Qualtrics survey. You load it
+  into Qualtrics and get a ready-made survey.
+- **SSO** (single sign-on): participants log in with the same work account they
+  use for email. Your organisation then tells Qualtrics who they are.
+- **Survey flow**: the Qualtrics screen that shows the order of the
+  survey's parts and the rules between them
+  ([Qualtrics guide](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/survey-flow-overview/)).
+- **Authenticator**: a step in the survey flow that asks participants to sign
+  in before they see what comes after it
+  ([Qualtrics guide](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/authenticator-overview/)).
+- **Embedded data**: extra columns Qualtrics fills in by itself, for
+  example the name it got from the sign-in
+  ([Qualtrics guide](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/standard-elements/embedded-data/)).
+
+The whole journey looks like this:
+
+```mermaid
+flowchart TD
+    A["Sample .qsf file"] --> B["Import into Qualtrics"]
+    B --> C["Survey flow: pick your SSO connection"]
+    C --> D["Publish"]
+    D --> E["Participant opens the link"]
+    E --> F["Signs in with work account"]
+    F --> G["Answers the questions"]
+    G --> H["Results: name, email, ID and answers per row"]
+```
+
+Stuck, or a colleague can't sign in? Common questions are answered in
+the [FAQ](FAQ.md).
+
+## The three example surveys
+
+All three start with a normal Qualtrics page that says what the survey
+is about. Only then does the participant sign in. After sign-in they see a
+small card: "Is this you? Your answers are linked to" with their name
+and email.
+
+### 1. Session availability
+
+For planning: which slots can participants join, and how?
+
+What the participant sees:
+
+1. A welcome page: "Pick your slots". It says they will sign in first,
+   and that all times are UTC.
+2. The sign-in page of their organisation.
+3. One page with the details card, then a grid. Each row is one of 8
+   one-hour slots over three days. For each row they choose: no,
+   remote, on site, or either. Every row needs an answer. Below
+   is an optional comment box.
+4. The thank-you page.
+
+```mermaid
+flowchart TD
+    W["Page 1: welcome"] --> S["Sign in with work account"]
+    S -->|login works| P["Page 2: details card, availability grid, comment"]
+    S -->|login fails| X["Thank-you page, empty response saved"]
+    P --> T["Thank-you page"]
+```
+
+What you get in the results: FirstName, LastName, Email and UserID from
+the sign-in. Then one answer per slot, coded 1 to 4: 1 no,
+2 remote, 3 on site, 4 either. Then the comment.
+
+### 2. Ranked preferences
+
+For choosing: participants pick their top 3 out of 10 options and put them in
+order. The sample options are made up, such as "Internal
+knowledge base" or "Accessibility audit". You replace them with your own.
+
+What the participant sees:
+
+1. A welcome page. It says they will sign in, pick 3 of 10 projects and
+   order them, best first.
+2. The sign-in page.
+3. The details card and one question: "Submit your picks now?" Yes or
+   not now.
+4. If **yes**: a page with 10 options in two columns. They must pick
+   exactly 3. After the third, the other boxes switch off.
+5. A page where they drag their 3 picks into order, first choice on top.
+   They must move at least one item, even if they like the order shown.
+6. An optional comment page, then the thank-you page.
+
+If **not now**: a short "No problem" page, then the thank-you page.
+
+```mermaid
+flowchart TD
+    W["Page 1: welcome"] --> S["Sign in with work account"]
+    S -->|login fails| X["Thank-you page, empty response saved"]
+    S -->|login works| I["Page 2: details card, submit picks now?"]
+    I -->|Yes| C["Page 3: choose exactly 3 of 10"]
+    C --> R["Page 4: drag the 3 into order"]
+    R --> M["Page 5: optional comment"]
+    M --> T["Thank-you page"]
+    I -->|Not now| N["Page 3: no problem"]
+    N --> T
+```
+
+What you get: FirstName, LastName, Email, UserID. A column
+**OptIn** with yes or no. Which 3 options were picked, and the
+rank given to each. Then the comment.
+
+### 3. Event attendance
+
+For events: will participants come? This one also lets in participants who have no
+work account.
+
+What the participant sees:
+
+1. A page with the event details (a sample lunch talk: date, time, room)
+   and one question: "How do you want to sign up?" Sign in with my work
+   account, or sign up without an account.
+2. Sign-in route: the sign-in page, then a page with the details card.
+   Other route: the same page, but with required boxes for first name,
+   last name and a valid email instead of the card.
+3. On that page, for both: "Can you make it?" (Yes / No), an optional
+   notes box, and buttons to add the event to a calendar: Google
+   Calendar, Outlook, or a calendar file for other apps.
+4. They press "Done" and see the thank-you page.
+
+```mermaid
+flowchart TD
+    E["Page 1: event details, how to sign up?"] -->|Sign in| S["Sign in with work account"]
+    E -->|Without an account| F2["Page 2: type name and email, RSVP, notes, calendar"]
+    S -->|login works| F1["Page 2: details card, RSVP, notes, calendar"]
+    S -->|login fails| X["Thank-you page, empty response saved"]
+    F1 --> A{"Can you make it?"}
+    F2 --> A
+    A -->|Yes| Y["Saved: RsvpStatus = yes"]
+    A -->|No| Z["Saved: RsvpStatus = no"]
+    Y --> T["Thank-you page"]
+    Z --> T
+```
+
+The two "Saved" steps happen behind the scenes. The participant does not
+see them.
+
+What you get: FirstName, LastName and Email for everyone. Typed answers
+are copied into the same columns, so all rows look alike. UserID is
+filled only for participants who signed in. A column **LoginMethod** says SSO or Manual. A
+column **RsvpStatus** says yes or no. The RSVP question itself is coded
+1 for yes, 0 for no. Typed email
+addresses are less reliable; expect some to bounce.
+
+## Try a sample yourself
+
+1. Download one of the three files from the project's
+   `skills/survey-qsf/samples` folder:
+   `session-availability-sso.qsf`, `ranked-preferences-sso.qsf` or
+   `event-attendance-sso.qsf`. Save it; no need to open it.
+2. In Qualtrics, create a new project, choose **Survey**, and pick
+   **Import a QSF file**. Select the file you saved
+   ([how importing works](https://www.qualtrics.com/support/survey-platform/survey-module/survey-tools/import-and-export-surveys/)).
+3. Open **Survey flow**.
+4. Click the authenticator step. Choose your organisation's SSO
+   connection from the list. The file only holds a placeholder (a row of
+   X's), so this step is a must. If no connection is listed, ask your
+   Qualtrics brand administrator (the person who manages your
+   organisation's Qualtrics account). They switch it on as described in
+   [Configuring Organization SSO Settings](https://www.qualtrics.com/support/survey-platform/sp-administration/brand-customization-services/sso/configuring-organization-sso-settings/). The same applies if you later move
+   the survey to another Qualtrics account: choose the connection again.
+5. Publish the survey.
+6. Take the
+   [anonymous link](https://www.qualtrics.com/support/survey-platform/distributions-module/web-distribution/anonymous-link/).
+   Open it in a normal browser window and go through the survey as a
+   participant would. Do not test with preview: sign-in through preview is
+   unreliable, as
+   [Qualtrics itself warns](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/sso-authenticator/).
+7. Look at your test response in the results. Your name and email should
+   be there.
+
+**If the link shows "Error while determining which SSO connection to use
+for this survey".** It may be that the SSO connection is not registered
+yet: the editor shows your connection, but the survey did not store it.
+The number in brackets after the message is only a report reference. Fix:
+
+1. Open **Survey flow** and click the authenticator step.
+2. In the **SSO Type** dropdown, select another method. Save the flow.
+   If saving does not stick, publish and then unpublish the survey.
+3. Switch **SSO Type** back to your original type and select your
+   connection again.
+4. Save the flow and publish again. If saving does not stick, publish
+   once more.
+5. Test again with the anonymous link, in a new normal browser window.
+
+```mermaid
+flowchart TD
+    E["Link shows: Error while determining which SSO connection"] --> O["Survey flow: open the authenticator"]
+    O --> A["SSO Type: select another method, save"]
+    A --> B["SSO Type: back to your type, select connection"]
+    B --> C["Save and publish"]
+    C --> T["Test with a fresh anonymous link"]
+    T -->|still an error| A
+```
+
+Then change the texts, dates and options to your own.
+
+Note: the files pass every check in the project, but have not been
+tried in every Qualtrics account. Small things may differ after import.
+For example, the error text shown when a participant picks the wrong number of
+options may need to be set again in the editor.
+
+## Why sign in first
+
+- Nobody types their name, so there are no typos and no nicknames.
+- You know who answered: each row carries the participant's ID.
+- The details card lets participants see that the survey knows who they are.
+
+Two practical warnings:
+
+- **A failed sign-in skips the survey.** If a participant cannot sign in,
+  Qualtrics sends them past all the questions to the thank-you page. They
+  will say "the survey ended at once". Qualtrics still saves an almost
+  empty response
+  ([Qualtrics on failed authentication](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/authenticator-overview/)).
+  Before you count results, remove rows without an email or ID.
+- **Tell participants to use a normal browser.** Sign-in can fail when the link
+  is opened inside the Teams or Outlook app, or in a private window.
+  Strict privacy settings and ad blockers can also get in the way. Ask
+  participants to copy the link into a normal browser window.
+
+Also good to know:
+
+- Participants can fill in the survey more than once. Each time is a new row.
+  Keep the last row per UserID.
+- If the details card shows an empty name, the participant's account did not
+  pass it on. The team that runs your organisation's login can fix that.
+- The page before the sign-in is on purpose: going straight to sign-in
+  is known to fail for some participants.
+
+## Email participants a copy of their answers
+
+Qualtrics can email each participant their own answers as soon as they
+finish. You set this up once per survey as a **workflow**: an automatic
+"when this happens, do that" rule
+([Qualtrics guide](https://www.qualtrics.com/support/survey-platform/actions-module/email-task/)).
+
+The samples already keep each participant's email address in a column
+called **Email**. It comes from the sign-in, or from what they typed in
+the event sample. The workflow sends to that column.
+
+```mermaid
+flowchart LR
+    R["Participant finishes the survey"] --> W["Workflow starts"]
+    W --> C{"Email filled in?"}
+    C -->|yes| M["Email: thank-you plus their answers"]
+    C -->|no| S["Nothing sent"]
+    M --> I["Participant's inbox"]
+```
+
+1. Open the survey and go to the **Workflows** tab. Click **Create a
+   workflow**, then **Started when an event is received**.
+2. Choose the **Survey response** event, for new responses only (not
+   updated or deleted ones).
+3. Click **+**, then **Add a condition**: Embedded data **Email** is not
+   empty. That skips rows without an address. In the event sample you
+   can add a second condition, for example only participants who said
+   yes.
+4. Click **+**, then **Add a task**, and choose **Email**.
+5. Fill in the email:
+   - **To**: click the piped text button, choose **Embedded Data Field**
+     and type `Email`. It shows up as `${e://Field/Email}`.
+   - **From Name**: your name or your team's. Leave the **From Address**
+     as it is, unless your organisation has set up its own.
+   - **Reply-To**: an address where you actually read replies.
+   - **Subject**: for example "Your answers: slot availability".
+   - **Message**: a short thank-you. Piped text can add their first name
+     (`${e://Field/FirstName}`) or a single answer.
+   - Tick **Include Response Report** to add all their answers. In its
+     options, set **Expiration** to a short period, such as 7 days: it
+     controls how long the link and the PDF keep working. Qualtrics
+     warns when you choose Never; don't, because the answers are
+     personal. Set the embedded data to **None** or only the survey
+     flow's fields, so internal columns stay out of the email.
+6. Save the task, check that the workflow is switched on, and publish
+   the survey.
+7. Test with the anonymous link and your own account, then check your
+   inbox and spam folder. Test and preview responses send real emails
+   too, so only test with your own address.
+
+Good to know:
+
+- Only finished responses send an email. A participant who stops
+  halfway gets nothing.
+- Typed addresses in the event sample can be wrong, and those emails
+  bounce.
+- Nothing arrives? See
+  [the FAQ on emails after a response](FAQ.md#emails-after-a-response).
+
+## Further reading
+
+The [FAQ](FAQ.md) answers common questions: sign-in
+problems, ranking and validation, emails after a response, themes.
+
+All from the official Qualtrics support site:
+
+- [Survey Flow Overview](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/survey-flow-overview/): the screen where you set the SSO connection.
+- [Authenticator Overview](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/authenticator-overview/): where to place it, retakes, what happens when sign-in fails.
+- [SSO Authenticator](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/sso-authenticator/): SSO types, the preview warning, error codes.
+- [Configuring Organization SSO Settings](https://www.qualtrics.com/support/survey-platform/sp-administration/brand-customization-services/sso/configuring-organization-sso-settings/): for your brand administrator.
+- [Embedded Data](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/standard-elements/embedded-data/): the extra columns filled by sign-in.
+- [Import and Export Surveys](https://www.qualtrics.com/support/survey-platform/survey-module/survey-tools/import-and-export-surveys/): loading a `.qsf` file.
+- [Anonymous Link](https://www.qualtrics.com/support/survey-platform/distributions-module/web-distribution/anonymous-link/): the link you send and test with.
+- [Email Task](https://www.qualtrics.com/support/survey-platform/actions-module/email-task/): the email step in a workflow, including the response report.
+- [Survey Theming](https://www.qualtrics.com/support/survey-platform/survey-module/look-feel/applying-survey-themes/): change the look, logo and colours after import.
+
+## For the technical colleague or AI assistant
+
+You can stop reading here. An AI agent is an AI assistant that can read
+and write files; a skill is a set of written instructions it reads before
+a specific job. This project holds one skill for `.qsf` files (JSON
+text): what real exports contain, what breaks silently on import, how the
+SSO authenticator behaves, plus copy-ready pieces for branches, embedded
+data, ranking and validation. A validator (a small program that checks a
+file's structure) and 40 automated tests come with it. All three samples
+pass, with one warning each: the SSO placeholder. Branch coverage is not
+checked; that stays a human job. A real export with sign-in contains the
+SSO connection's secret key: treat it like a password.
+
+```sh
+python3 skills/survey-qsf/scripts/validate_qsf.py skills/survey-qsf/samples/*.qsf --fresh
+python3 -m unittest discover -s tests
+```
+
+Drop `--fresh` when checking a real export instead of a generated file.
+
+===============================================================================
+FILE: instructions/FAQ.md
+===============================================================================
+# Frequently asked questions
+
+Common questions about surveys with sign-in (SSO). For the step-by-step
+guide, see [the plain guide](guide.md).
+
+Menu names in Qualtrics differ a little between accounts and change over
+time. If a step doesn't match what you see, search the
+[Qualtrics support site](https://www.qualtrics.com/support/) for the
+setting's name.
+
+## Sign-in (SSO)
+
+### Sign-in works for me but not for a participant. What's wrong?
+
+If the survey works for you, the setup is usually fine. Check these, in
+this order:
+
+1. **Preview link.** Did they open a preview link? Sign-in through
+   preview is unreliable. Send them the anonymous link.
+2. **Browser.** Links opened inside the Teams or Outlook app, private
+   windows, strict privacy settings and ad blockers can break the
+   sign-in. Ask them to paste the link into a normal browser window.
+3. **Account type.** Guest or some staff accounts may not pass their
+   name and email to Qualtrics. Only the team that runs your
+   organisation's login can fix that.
+
+A failed sign-in sends participants straight to the end of the survey, so they
+will say "it ended at once". Qualtrics still saves an almost empty
+response. Remove rows without an email or ID before you count results.
+
+### Where does Qualtrics say preview doesn't work with SSO?
+
+On the
+[SSO Authenticator](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/sso-authenticator/)
+support page, which warns that this SSO type "may not function properly
+with Preview Survey" and suggests testing with the anonymous link.
+
+### Could bot detection (reCAPTCHA) be blocking participants?
+
+Unlikely. Qualtrics' support pages describe bot detection as adding a
+score to each response; it doesn't stop any participant taking the survey. To
+switch it off anyway: **Survey options › Security › Bot detection**,
+then **Publish**. The live link keeps the old setting until you publish.
+
+### After importing a sample, the link says "Error while determining which SSO connection to use". How do I fix it?
+
+The sample file only holds a placeholder connection, and the editor can
+show your connection without actually saving it. This fix worked:
+
+1. In **Survey flow**, open the authenticator.
+2. Change **SSO Type** to another method and save. If saving doesn't
+   stick, publish and then unpublish.
+3. Switch **SSO Type** back and select your connection again.
+4. Save and publish. If saving doesn't stick, publish once more.
+5. Test with a fresh anonymous link in a normal browser window.
+
+The number in brackets after the message is only a reference for
+reports. If no connection is listed at all, your Qualtrics brand
+administrator has to switch SSO on for survey authenticators.
+
+## Questions and answers
+
+### How do I ask that I want something else?
+Ask directly opening an [issue](https://github.com/all-hands/survey-skill/issues). You can also contribute directly with a [pull request](https://github.com/all-hands/survey-skill/pulls).
+
+### Participants pick 3 options and then rank them. Do they have to move anything, or can they just click Next?
+
+With a drag-and-drop ranking and **Force response** on, an untouched
+ranking counts as unanswered, so Next shows "Please answer this
+question". Participants have to drag at least one item (they can drop it back
+in place). Without Force response, an untouched ranking is saved as
+blank, not as 1 to 3.
+
+The easier option is to show the ranking as radio buttons: one row per
+option, one column per rank, each rank used once. It is also easier to
+use with a keyboard or screen reader.
+
+### Can I make participants pick exactly 3 options, without JavaScript?
+
+Yes. On the question, go to **Response requirements › Add validation ›
+Answers range** and set both minimum and maximum to 3. Also turn on
+**Force response**, so picking nothing doesn't pass. Test in preview with
+0, 2, 3 and 4 options ticked.
+
+"Minimum choices" on its own only checks the lower limit, so participants
+could still pick 4 or more.
+
+### How do I change the "Please answer this question." message?
+
+Under **Survey options › Responses › Custom error messages**, create a
+new message for "Require response", enter your text, save it and
+publish. This changes the message for the whole survey, so keep the
+wording general. For one question only, give that question its own
+custom validation with its own message. You can change the text, not the
+style.
+
+### What else is worth setting before the survey goes live?
+
+- Stop participants from taking the survey twice with the same login, or plan
+  to keep only their newest response.
+- Set a closing date.
+- Write your own thank-you message for the end of the survey.
+- Delete questions you no longer use, including those in the Trash
+  block.
+- Give questions readable export names (`preferred_session`, not `Q7`). That
+  makes the results file much easier to work with.
+
+## Emails after a response
+
+### How do I email participants a copy of their answers?
+
+With a workflow that sends an email after each response, with their
+answers attached. The steps are in the guide:
+[Email participants a copy of their answers](guide.md#email-participants-a-copy-of-their-answers).
+
+### I set up a workflow that sends an email after each response, but nothing is sent. Why?
+
+First open **Workflows › Run history**:
+
+- **No run at all**: the trigger never fired.
+- **Stopped at the condition**: the condition didn't match.
+- **Email task failed**: the error is shown there.
+- **Succeeded, but nothing arrived**: a delivery problem (spam folder,
+  mail filters).
+
+With sign-in surveys, the usual cause is the **To** field. "Recipient
+Email" refers to a contact list, and is empty when participants sign in. Their
+address comes from the sign-in as embedded data instead, so use the
+`Email` embedded data field as the recipient. Also check that the
+workflow is switched on and fires for new responses only. Unfinished
+responses don't trigger it: the email goes out only after the last page.
+
+## Look and feel
+
+### I imported a sample and my organisation's logo appears. Is it in the file?
+
+No. The samples don't name a theme, so Qualtrics uses your account's
+default theme, which can include a logo. Change it per survey under
+**Look & feel**.
+
+### How do I make a theme the default?
+
+Only a brand administrator can. In the admin pages, under **Themes**,
+the theme at the top of the list becomes the default for new projects.
+Existing surveys don't change. Everyone else can only pick a theme per
+survey.
+
+## For the technical colleague or AI assistant
+
+### What surprised us in real `.qsf` exports?
+
+- Messages (end of survey, error texts) are stored as references to the
+  account's message library, so they break when the file is imported
+  into another account. Set them again after import.
+- A ranking fed by an earlier question keys its recodes as `x` plus the
+  source choice ID.
+- A copied survey's JavaScript can still contain the original survey's
+  ID.
+- A footer script can arrive cut off mid-code.
+- A real export with sign-in contains the SSO connection's secret key.
+  Treat it like a password and keep it out of the repo.
+
+The skill (`skills/survey-qsf/SKILL.md`) covers these in detail.
+
+===============================================================================
+FILE: skills/survey-qsf/SKILL.md
+===============================================================================
+---
+name: survey-qsf
+description: >-
+  Quirks of Qualtrics .qsf survey files. Use when editing a real Qualtrics
+  export, generating a .qsf to import, adding an SSO authenticator, branches,
+  embedded data, carry-forward ranking, custom validation, JS or CSS, or when
+  an import fails or SSO login breaks for some respondents.
+---
+
+# Qualtrics QSF: the quirks layer
+
+You already know QSF basics (SurveyEntry, SurveyElements, BL/FL/SQ/SO, QIDs,
+choices). This skill is the layer above: what real tenant exports actually
+contain, what breaks silently, and how SSO behaves. Every quirk below was
+observed in working exports, not inferred from docs, unless marked
+*unverified*.
+
+## 1. Pick the mode first
+
+| Mode | When | Rule |
+|---|---|---|
+| **Fresh** | No export involved; you write the file | Portable defaults (§3), `validate_qsf.py --fresh` |
+| **Edit in place** | User hands you a real export and wants a change | Keep every tenant field as found; recompute list (§4) |
+| **Rebuild** | Export is broken beyond patching | Extract content, rebuild fresh, re-add tenant features from `references/feature-shapes.md` |
+
+Mixing modes is the fatal habit: patching an export with fresh defaults
+(blanket `SurveyBrandID: "qualtrics"`, stripping `PL`, renumbering QIDs)
+destroys tenant configuration the user wanted kept. State the mode to the
+user before the first write, and back the file up.
+
+## 2. Export reality
+
+Facts a genuine export holds that a hand-written file would not:
+
+- **`BL.Payload` may be a keyed map**, `{"0": {...}, "1": {...}, "4": {...}}`,
+  with gaps where blocks were deleted. The array form imports too. Edit in
+  place: keep the form you found.
+- **Block IDs are free-form**: readable IDs shaped like `BL_Intro01`
+  occur in real exports. Read
+  with `BL_[A-Za-z0-9]+`; mint `BL_` + 15 alphanumerics. `SV_`/`UR_`/`RS_`
+  were always 15.
+- **Trash** can hold questions (each keeps its full `SQ`), need not be the
+  last block, and never appears in the flow. `QC.SecondaryAttribute` counts
+  **all** SQ elements, trashed included.
+- **Flow item `Type` follows `SubType`, not the block's `Type`**: a BL block
+  with a `SubType` key (even `""`) appears in flow as `"Type": "Standard"`;
+  without it, `"Type": "Block"`.
+- **FlowIDs are creation-ordered**: a branch can contain lower FlowIDs than
+  itself, deleted items leave holes, and `Properties.Count` = max numeric
+  FlowID, holes included. Inserting: mint `FL_<Count+1>`, bump `Count`, never
+  renumber.
+- **One block can sit in several branches** (one shared form reached by an
+  SSO route and a manual route). Only the branch that fires shows it.
+- **`/` is serialized as `\/`** inside strings (`q:\/\/QID2\/SelectableChoice\/1`).
+  Same value after `json.load`; plain `/` imports fine. Never treat the two
+  spellings as different values.
+- **Type discipline per key**: SO `BackButton`, `SaveAndContinue`,
+  `BallotBoxStuffingPrevention`, `SecureResponseFiles`, `RecaptchaV3` are
+  strings `"true"`/`"false"`; `ProtectSelectionIds`, `ConfirmStart`,
+  `AutoConfirmStart`, `AutoCloseSurvey` are JSON booleans; `ForceResponse` is
+  `"ON"`/`"OFF"`; `RightOperand`, `MinChoices`, recode values are strings.
+  Copy the observed type, never normalize.
+- **Placeholder text** (`"Click to write Choice 1"`) marks an untouched
+  editor question: template debris, usually trashed.
+- **`SecondaryAttribute` of an SQ** is a ~100-char plain-text echo of the
+  question, ending in `...`. Cosmetic; keep it roughly in sync.
+- **"Copy survey" provenance**: a copy keeps owner `UR_`, every `BL_` and
+  `QID`; mints new `SV_`, `RS_`, `PreviewID`; appends " - Copy"; resets
+  `SurveyStatus` to `Inactive`. Same lineage, not a new design.
+- **IDs hard-coded inside JS do not follow a copy**: an exported copy still
+  used a `sessionStorage` key naming the *original* survey's `SV_` ID. Grep
+  `QuestionJS` and `SO.Footer` for `SV_` after copying.
+- **`SO.Footer` arrived cut mid-script** (a few thousand chars, unclosed
+  `<script>`, IIFE never closed) in one export. Cause unknown; the
+  validator warns on it. Move long JS into `QuestionJS` instead.
+- **Message-library references travel as IDs only**: `EOSMessage`,
+  `ValidationMessage`, and custom validation `Message.messageID` name a
+  message in the owner's library (`MS_…` + `UR_…` library). In another
+  account they dangle. Fresh files: `SurveyTermination: "DefaultMessage"`,
+  no `MS_` IDs, re-pick custom messages in the editor after import. Keep
+  each message ID with its library ID as a pair.
+- **`PL` (preview link)** sits after `FL` in exports. Edit in place: leave
+  it. Fresh: omit it; Qualtrics mints one.
+
+## 3. Fresh-file defaults
+
+`SurveyBrandID: "qualtrics"`, `SkinLibrary: "qualtrics"`,
+`Skin.brandingId: null`, `SurveyStatus: "Inactive"`, synthetic `UR_` used for
+both owner and creator (the importer replaces it), no `PL`, no `MS_` IDs,
+array-form `BL` with an empty Trash block last. Never invent a tenant brand,
+skin ID, SSO connection ID or library ID.
+
+## 4. Recompute list
+
+After any edit, recompute each of these. Every one has broken an import or a
+survey when left stale:
+
+1. `QC.SecondaryAttribute`: string of the SQ count, trashed included.
+2. `FL.Payload.Properties.Count`: max FlowID.
+3. `NextChoiceId` / `NextAnswerId`: strictly greater than the max ID in use.
+4. `ChoiceOrder`: it is **both filter and order**. IDs need not be
+   contiguous or sorted (`[..."7", "12", "8"...]` happens); a choice absent
+   from `ChoiceOrder` is not displayed.
+5. Every `QIDn` reference: SQ envelope, `Payload.QuestionID`, BlockElements,
+   logic (`QuestionID`, `QuestionIDFromLocator`, `ChoiceLocator`,
+   `LeftOperand`), `DynamicChoices.Locator`, `${q://…}` pipes in text, JS and
+   embedded-data values.
+6. Carry-forward keys: `RecodeValues`/`VariableNaming` on a carried-forward
+   question are keyed `x` + source choice ID (`"x3"`), not plain IDs.
+7. Branch coverage: every choice of a routing question still has a branch.
+
+**Done when** `python3 scripts/validate_qsf.py <file>` (add `--fresh` in
+fresh mode) reports 0 errors and you have read every warning; in edit mode,
+a diff against the backup shows only the intended change.
+
+The validator (stdlib, in this skill's `scripts/`) checks 1–6 plus IDs,
+element set, SurveyID consistency, orphaned questions, flow→trash refs, SO
+boolean types, dangling library pairs, footer scripts and SSO placement.
+Branch coverage (7) is yours to check.
+
+## 5. SSO in one screen
+
+- Everything the respondent should answer **only after login** goes
+  **inside** the authenticator's `Flow`. `respondentMap` writes IdP
+  attributes into embedded data (`FirstName`, `LastName`, `Email`, an ID).
+- **Put a welcome block before the authenticator.** Authenticator-first
+  redirects to the IdP before any Qualtrics page renders; that layout failed
+  for some respondents, while intro-then-authenticator worked.
+- A failed login **skips the whole authenticated section**: respondent lands
+  on the thank-you page, and an almost-empty response is recorded.
+- SSO through `/jfe/preview/` links is unreliable by Qualtrics' own docs:
+  test with the live anonymous link in a normal browser window.
+- `SSOOptions.SSOID` and `token.Key` belong to a brand's SSO connection.
+  Exports embed the key: **treat any export with an authenticator as a
+  secret**. Samples here carry `X` placeholders; after import, open Survey
+  flow → authenticator and pick your connection. The editor may *display*
+  a connection while the flow still stores the placeholder; respondents
+  then get "Error while determining which SSO connection to use for this
+  survey". Fix: switch SSO Type to another value, save, switch back,
+  re-select the connection, save, publish.
+- `allowRetake: true` means one person can produce several rows: dedupe on
+  the ID field, last submission wins.
+
+Read `references/sso.md` when wiring a new authenticator, mixing SSO with a
+non-SSO route, or diagnosing "SSO works for me, not for them".
+
+## 6. Feature shapes
+
+`references/feature-shapes.md` holds copy-ready JSON, from working exports,
+for: embedded data (declare, then set per branch), branches with
+descriptions, select-exactly-N with custom validation, multi-column
+multi-select, drag-and-drop ranking with carry-forward, display logic,
+perma-hide, matrix grid, email validation, QuestionJS/CSS, and recodes.
+Read it before adding any of those to a file.
+
+## 7. Samples
+
+Three importable, anonymized samples in `samples/`. Each has an SSO
+authenticator, never as the first flow element: a welcome page (or, in the
+event sample, event details plus a route question) comes first. The event
+sample also offers a manual route around SSO. Pick the nearest, copy it,
+change text, keep the shapes.
+
+| File | Shows |
+|---|---|
+| `session-availability-sso.qsf` | Welcome → authenticator → identity card (`${e://Field/…}` piping) + matrix grid (session × attendance mode) with `VariableNaming` |
+| `ranked-preferences-sso.qsf` | Opt-in branch with embedded data per route; pick exactly 3 of 10 (custom validation + JS limiter, 2 columns); drag-rank the picks (carry-forward, `x`-keyed recodes); `SubType: ""` block spelled `Standard` in flow |
+| `event-attendance-sso.qsf` | SSO route **or** manual route into one shared block; display logic per route; manual answers copied into the same embedded fields; RSVP yes/no recoded `1`/`0` and mirrored to `RsvpStatus`; static Outlook/Google calendar links plus an `.ics` download built as a blob URL in `QuestionJS` |
+
+Import: new project → Survey → *Import a QSF file*. Then: set the SSO
+connection in Survey flow, publish, test on the anonymous link. The samples
+are structurally validated, not import-tested in every account; *unverified*:
+whether a custom validation `Message` without library IDs keeps its
+description text on import.
+
+## 8. Postflight
+
+- [ ] Mode stated; backup taken (edit mode)
+- [ ] Recompute list done; validator 0 errors, warnings read
+- [ ] No tenant field baseline-ified (edit) / no tenant field invented (fresh)
+- [ ] Authenticator after a welcome block; SSO placeholders or real values handled per §5
+- [ ] File with a real SSO key kept out of public repos, chats and open shares
+- [ ] Hand-off reminder (§9) in your reply
+
+## 9. Hand-off reminder
+
+Whenever your reply delivers or changes a `.qsf` that contains an
+authenticator, end the reply with this reminder, adapted to the user's
+SSO type:
+
+> **After import, register the SSO connection, or respondents get "Error
+> while determining which SSO connection to use for this survey":**
+> 1. Survey flow → click the authenticator.
+> 2. SSO Type: select another type, save the flow.
+> 3. SSO Type: back to Shibboleth (or your type), select your connection,
+>    save the flow.
+> 4. Publish. If saving does not stick, publish and unpublish, then
+>    publish again.
+> 5. Test with the anonymous link in a normal browser window, not preview.
+
+The editor shows a connection even when the flow still stores a
+placeholder or another brand's `SSOID`; only the switch-and-save makes it
+stick. Confirmed on a sample import.
+
+===============================================================================
+FILE: skills/survey-qsf/references/sso.md
+===============================================================================
+# SSO authenticator: shape, placement, failure modes
+
+Reached from `SKILL.md` §5. Observed on two surveys using the same
+Shibboleth connection with an identical authenticator config: one worked
+for every respondent tested, the other failed for some.
+
+## Shape (Shibboleth)
+
+"Shibboleth" is Qualtrics' label for SAML-based SSO ("Respondents
+authenticate via SAML"), whatever SAML identity provider the organisation
+runs. Other SSO types: Token, CAS, LDAP, Google OAuth 2.0, Facebook.
+
+```json
+{
+  "Type": "Authenticator",
+  "FlowID": "FL_3",
+  "FilterDataFields": true,
+  "SSOOptions": {
+    "respondentMap": [
+      { "key": "urn:oid:2.5.4.42",                  "value": "FirstName" },
+      { "key": "urn:oid:2.5.4.4",                   "value": "LastName" },
+      { "key": "urn:oid:0.9.2342.19200300.100.1.3", "value": "Email" },
+      { "key": "urn:oid:0.9.2342.19200300.100.1.1", "value": "UserID" }
+    ],
+    "Type": "Shibboleth",
+    "token": { "EncryptionMethod": "3DES", "MacMethod": "sha512",
+               "Leeway": 300, "Key": "XXXXXXXXXXXXXXXX" },
+    "ldap": { "Hostname": "ldap://", "Port": "389", "EmailField": "mail",
+              "Filter": "(sAMAccountName=%1)", "FirstNameField": "givenname",
+              "LastNameField": "sn", "ExternalDataReferenceField": "" },
+    "UsePanel": "No", "CaptureRespondentInfo": "Yes", "UseSSO": "Yes",
+    "SSOID": "ASC_XXXXXXXXXXXXXXX", "cas": []
+  },
+  "Options": {
+    "maxAttempts": 3,
+    "questionText":              { "SystemMessage": { "Section": "ErrorCodes", "Message": "EAUTH04" } },
+    "authenticationError":       { "SystemMessage": { "Section": "ErrorCodes", "Message": "EAUTH02" } },
+    "failedAuthenticationError": { "SystemMessage": { "Section": "ErrorCodes", "Message": "EAUTH05" } },
+    "allowRetake": true, "loadExistingSession": false, "reauthenticateSession": false
+  },
+  "Flow": [ "...everything that needs a signed-in respondent..." ]
+}
+```
+
+- `respondentMap` keys are SAML attribute OIDs (givenName, sn, mail, uid);
+  values are embedded-data field names, which become response columns. The
+  IdP decides which attributes it releases; a missing one arrives blank.
+- `token` and `ldap` are carried even for Shibboleth (default-looking
+  values). `token.Key` is real secret material in an export.
+- `SSOID` (`ASC_…`) names the brand-level SSO connection. It is per brand:
+  a file moved to another brand needs the connection re-picked in Survey
+  flow. Wrong or disabled connection shows Qualtrics error
+  `AUTHENTICATOR_SSO_CONFIG_DISABLED` / `…_NOT_FOUND` for **everyone**.
+- `Autofill` is never on an authenticator item; only on Block/Standard.
+
+## Placement
+
+| Layout | Observed |
+|---|---|
+| Authenticator as very first flow element, all blocks inside | Worked for some respondents, failed for others |
+| Welcome page first, authenticator inside a branch after a routing question | Worked for everyone tested |
+
+Authenticator-first redirects to the IdP on the first page load, before any
+Qualtrics page has set its session; embedded/in-app browsers and strict
+cookie settings are likelier to lose the session on that immediate
+redirect. Qualtrics' own advice is "move the authenticator to the beginning
+of your survey flow", so authenticator-first is not a config *error*, just
+the riskier layout. Default: a welcome block with **no** `${e://Field/…}`
+piping (nothing is filled before login), then the authenticator.
+
+## What failure looks like
+
+- Login fails → after `maxAttempts`, Qualtrics **skips the authenticated
+  section**. If every block is inside it, the respondent goes straight to
+  the thank-you page. "SSO broken" is reported as "the survey ends at once".
+- Failed authentications **are recorded as responses**: rows with no
+  identity fields. Filter rows without the ID/email before analysis.
+- Login works, attributes missing → identity card shows blank name/email.
+  IdP attribute release for that account type; the IdP admins fix it.
+
+## Diagnosis: "works for me, not for them"
+
+Identical config cannot fail for one person only, so look at how they open
+it:
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| Never reaches the IdP login | Preview link, or browser | URL contains `/jfe/preview/` → send the live anonymous link `/jfe/form/SV_…` |
+| Bounces between IdP and Qualtrics | Cookies lost across the redirect | Opened inside Teams/Outlook/mail app, private mode, strict tracking protection, ad-block → normal Chrome/Edge window, extensions off |
+| IdP shows "not authorised for this service" | Account type not released to Qualtrics | Guest/external/staff vs regular account → IdP admins |
+| Lands on thank-you page immediately | Login failed and was skipped | Combine with the rows above; look for an empty response at that time |
+| Identity card blank | Attributes not released | IdP admins |
+| "Error while determining which SSO connection to use for this survey. Please contact your brand administrator." plus a report tag | Imported file's `SSOID` is unknown in this brand (placeholder or another brand's ID). The editor *displays* a connection but has not stored it | Survey flow → authenticator: switch SSO Type to another value, save; switch back, re-select the connection, save, publish. If saving does not stick, publish/unpublish to force it. Confirmed fix on a sample import |
+| Silent login as the wrong person | Already signed in to the IdP with another account | Sign out of the IdP or use a fresh browser profile |
+
+Cross-check: have them open a survey whose SSO is known to work, in the
+same browser. Fails there too → their account or browser. Works there →
+try the welcome-block-first layout.
+
+## Mixed SSO and non-SSO routes
+
+To admit participants without an account while keeping one response schema:
+
+1. Default block: welcome + routing question ("Sign in" / "Register without
+   signing in").
+2. Branch on choice 1 → authenticator → embedded `LoginMethod = SSO` →
+   shared form block.
+3. Branch on choice 2 → embedded `LoginMethod = Manual` and declare
+   `FirstName`/`LastName`/`Email`/ID empty → same shared form block →
+   embedded data copying `${q://QIDn/ChoiceTextEntryValue}` of the typed
+   name/email into the same fields.
+4. In the shared block, display logic per route: identity card (piped) for
+   SSO, text-entry name/email (required, email `ContentType: ValidEmail`)
+   for manual. Hidden required questions do not block the page.
+
+Every row then has the same identity columns regardless of route; typed
+addresses are less reliable than SSO ones (expect bounces).
+
+## Other options
+
+- `maxAttempts`: Qualtrics generally advises against it for SSO; it matters
+  only with "associate respondent with panel" (`UsePanel: "Yes"`). Observed
+  value 3 is harmless.
+- `allowRetake: true` → repeat submissions; decide a rule (last per ID
+  wins) or turn it off.
+- `loadExistingSession` / `reauthenticateSession`: reload saved progress /
+  force re-login on resume. Both `false` in every observed survey.
+- Bot detection (`RecaptchaV3`) only adds a score; it never blocks
+  respondents, so it is not an SSO suspect.
+
+## Sources
+
+- Qualtrics, [SSO Authenticator](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/sso-authenticator/): Shibboleth section, preview limitation ("may not function properly with preview survey"), test via anonymous link, error codes, max-attempts advice.
+- Qualtrics, [Authenticator Overview](https://www.qualtrics.com/support/survey-platform/survey-module/survey-flow/advanced-elements/authenticator/authenticator-overview/): placement, retake/reload options, failed authentications recorded as responses, skip-past behaviour.
+- Qualtrics, [Fraud Detection](https://www.qualtrics.com/support/survey-platform/survey-module/survey-checker/fraud-detection/): bot detection never blocks respondents.
+
+===============================================================================
+FILE: skills/survey-qsf/references/feature-shapes.md
+===============================================================================
+# Feature shapes
+
+Copy-ready shapes from working exports, reached from `SKILL.md` §6. QIDs and
+FlowIDs are examples: renumber to your file and run the recompute list
+afterwards. Each shape is used in at least one file in `../samples/`.
+
+## Embedded data: declare, then set per branch
+
+Declare once (empty `Value`) before branching, set inside each branch.
+`Value` takes a literal or a pipe.
+
+```json
+{ "Type": "EmbeddedData", "FlowID": "FL_4",
+  "EmbeddedData": [
+    { "Description": "OptIn", "Type": "Custom", "Field": "OptIn",
+      "VariableType": "Nominal", "DataVisibility": [], "Value": "" } ],
+  "Options": { "VarTypes": "Yes" } }
+```
+
+```json
+{ "Type": "Custom", "Description": "Email", "Field": "Email",
+  "Value": "${q://QID6/ChoiceTextEntryValue}", "VariableType": "Nominal" }
+```
+
+`DataVisibility: []` appears on some field rows and not others in exports;
+both import. Flow items of type EmbeddedData, Branch and Authenticator carry
+no `Autofill`; Block/Standard items carry `"Autofill": []`.
+
+Use embedded fields as the **stable contract** for downstream code (exports,
+mail merges): set a route or status field per branch instead of making
+scripts decode choice IDs.
+
+## Branch
+
+```json
+{ "Type": "Branch", "FlowID": "FL_6", "Description": "Yes — choose 3, rank, comment",
+  "BranchLogic": { "0": { "0": {
+      "LogicType": "Question", "QuestionID": "QID3", "QuestionIsInLoop": "no",
+      "ChoiceLocator": "q://QID3/SelectableChoice/1", "Operator": "Selected",
+      "QuestionIDFromLocator": "QID3", "LeftOperand": "q://QID3/SelectableChoice/1",
+      "Type": "Expression", "Description": "If QID3 choice 1 is selected" },
+    "Type": "If" }, "Type": "BooleanExpression" },
+  "Flow": [ ... ] }
+```
+
+`Description` is the label in the flow editor and survives export: write
+route names. A second condition in the same group is key `"1"` with
+`"Conjuction": "Or"` (Qualtrics' spelling, one *n*).
+
+## Display logic on a question
+
+Same expression object, wrapped with `inPage`:
+
+```json
+"DisplayLogic": { "0": { "0": {
+    "ChoiceLocator": "q://QID2/SelectableChoice/2",
+    "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">How would you like to register?</span> <span class=\"LeftOpDesc\">Register without signing in</span> <span class=\"OpDesc\">Is Selected</span> ",
+    "LeftOperand": "q://QID2/SelectableChoice/2", "LogicType": "Question",
+    "Operator": "Selected", "QuestionID": "QID2", "QuestionIDFromLocator": "QID2",
+    "QuestionIsInLoop": "no", "Type": "Expression" },
+  "Type": "If" }, "Type": "BooleanExpression", "inPage": false }
+```
+
+`Description` is HTML the editor renders; exports may hold stray newlines
+inside it. Content is cosmetic, the locators are what run.
+
+## Perma-hide (park a question without trashing it)
+
+```json
+"DisplayLogic": { "0": { "0": {
+    "LogicType": "BooleanValue", "Value": "False", "Type": "Expression",
+    "Description": "<span class=\"ConjDesc\">If</span><span> False</span>" },
+  "Type": "If" }, "Type": "BooleanExpression", "inPage": false }
+```
+
+The other way: move its BlockElements entry into the Trash block and keep
+its SQ.
+
+## Select exactly N (custom validation)
+
+```json
+"Validation": { "Settings": {
+  "ForceResponse": "OFF", "ForceResponseType": "ON", "Type": "CustomValidation",
+  "MinChoices": "3", "MaxChoices": "3",
+  "CustomValidation": {
+    "Logic": { "0": { "0": {
+        "ChoiceLocator": "q://QID4/SelectedChoicesCount",
+        "LeftOperand": "q://QID4/SelectedChoicesCount",
+        "Operator": "EqualTo", "RightOperand": "3",
+        "LogicType": "Question", "QuestionID": "QID4", "QuestionIDFromLocator": "QID4",
+        "QuestionIsInLoop": "no", "Type": "Expression", "Description": "..." },
+      "Type": "If" }, "Type": "BooleanExpression" },
+    "Message": { "description": "Please select exactly 3 options.",
+                 "subMessageID": "VE_CUSTOM_VALIDATION_0" } } } }
+```
+
+`ForceResponse: "OFF"` with the custom validation doing the enforcing is
+normal. In exports `Message` also carries `messageID` + `libraryID` (owner's
+library); drop both in fresh files. Pair with a JS limiter that disables
+further boxes at N (see `ranked-preferences-sso.qsf`, QID4) so the error
+rarely fires.
+
+Exports also use `CustomValidation` as a disguised force-response (OR of
+"choice 1 selected", "choice 2 selected", `subMessageID:
+"VE_FORCE_RESPONSE"`). Plain `"ForceResponse": "ON"` does the same job.
+
+## Multi-select in columns
+
+```json
+"QuestionType": "MC", "Selector": "MACOL", "SubSelector": "TX",
+"Configuration": { "QuestionDescriptionOption": "UseText", "NumColumns": 2 }
+```
+
+Column count lives in `Configuration`, not in the choices.
+
+## Drag-and-drop ranking of carried-forward choices
+
+```json
+{ "QuestionType": "RO", "Selector": "DND", "SubSelector": "TX",
+  "Choices": [], "ChoiceOrder": [], "NextChoiceId": 1,
+  "DynamicChoices": { "DynamicType": "ChoiceGroup",
+                      "Locator": "q://QID4/ChoiceGroup/SelectedChoices", "Type": "Dynamic" },
+  "DynamicChoicesData": [],
+  "Validation": { "Settings": { "ForceResponse": "ON", "ForceResponseType": "ON", "Type": "None" } },
+  "RecodeValues":   { "x1": "1", "x2": "2" },
+  "VariableNaming": { "x1": "P01 — Customer onboarding redesign", "x2": "P02 — ..." } }
+```
+
+- `Choices` is an **empty array**, not `{}`.
+- Carried-forward choices are keyed **`x` + source choice ID**. Keys without
+  the `x` match nothing.
+- The source question must show earlier in flow order.
+- With `ForceResponse: "ON"`, a respondent who likes the default order must
+  still drag one item (anywhere, even back in place) before the page
+  submits. Say so in the question text.
+- Piping `${q://QID4/ChoiceGroup/SelectedChoices}` on a review page shows the
+  picks in **choice order, not rank order**. One export had such a review
+  page, parked in Trash.
+
+## Matrix grid (one answer per row)
+
+```json
+{ "QuestionType": "Matrix", "Selector": "Likert", "SubSelector": "SingleAnswer",
+  "Configuration": { "QuestionDescriptionOption": "UseText", "TextPosition": "inline",
+                     "ChoiceColumnWidth": 45, "RepeatHeaders": "none",
+                     "WhiteSpace": "OFF", "MobileFirst": true },
+  "Choices": { "1": { "Display": "Monday 1 March 2027, 09:00-11:00" } },
+  "ChoiceOrder": ["1"],
+  "Answers": { "1": { "Display": "No" }, "2": { "Display": "Remote" } },
+  "AnswerOrder": ["1", "2"],
+  "RecodeValues":   { "1": "1", "2": "2" },
+  "VariableNaming": { "1": "NO", "2": "REMOTE" },
+  "NextChoiceId": 2, "NextAnswerId": 3,
+  "DefaultChoices": false, "ChoiceDataExportTags": false, "GradingData": [] }
+```
+
+Rows are `Choices`, columns are `Answers`; on a matrix, `RecodeValues` and
+`VariableNaming` key on **answers**. Both `Next…Id` counters apply.
+
+## Text entry
+
+```json
+"QuestionType": "TE", "Selector": "SL",
+"Validation": { "Settings": { "ForceResponse": "ON", "ForceResponseType": "ON",
+                              "Type": "ContentType", "ContentType": "ValidEmail" } },
+"SearchSource": { "AllowFreeResponse": "false" }
+```
+
+`Selector` `SL` single line, `ML` multi-line (box size in
+`Configuration.InputWidth`/`InputHeight`). `SearchSource` rides along on TE
+exports.
+
+## Recodes and labels
+
+- `RecodeValues` may be non-monotonic: yes/no as `{"1": "1",
+  "2": "0"}` makes the column a 0/1 flag.
+- `VariableNaming` gives choices short analysis labels (`"1": "P01"`).
+- Both are string→string maps at payload level.
+- `DataExportTag` is the response column name: make it semantic
+  (`rsvp`) and treat it as contract between survey waves.
+
+## Custom code
+
+- `QuestionJS`: one string of JS using
+  `Qualtrics.SurveyEngine.addOnReady` / `addOnPageSubmit`; several hooks
+  may sit in one string. Observed uses: change the Next button label,
+  limit checkbox count, build an `.ics` blob URL, write to `sessionStorage`.
+- `SO.CustomStyles.customCSS`: raw CSS for the whole survey. `:has()` works
+  for styling selected choices.
+- `SO.Footer`: HTML including `<script>`; see the truncation quirk in
+  `SKILL.md` §2. Prefer `QuestionJS`.
+- Inline-styled HTML in `QuestionText` (cards, buttons) survives round
+  trips. Edit in place: preserve all of the above byte for byte.
+
+===============================================================================
+FILE: skills/survey-qsf/scripts/validate_qsf.py
+===============================================================================
+#!/usr/bin/env python3
+"""Structural validator for Qualtrics .qsf files.
+
+Default mode accepts genuine tenant exports (keyed-map BL, free-form block
+IDs, FlowID gaps, trashed questions). --fresh adds the rules for files you
+generate yourself (array BL, 15-char IDs, neutral brand, no PL, no
+message-library refs).
+
+    python3 validate_qsf.py survey.qsf [more.qsf ...] [--fresh]
+
+Prints ERROR / WARN lines; exit 1 if any ERROR.
+Stdlib only.
+"""
+import json
+import re
+import sys
+
+ID15 = r"[A-Za-z0-9]{15}"
+STRING_BOOL_SO_KEYS = ("BackButton", "SaveAndContinue", "BallotBoxStuffingPrevention", "SecureResponseFiles",
+                       "RecaptchaV3")
+REAL_BOOL_SO_KEYS = ("ProtectSelectionIds", "ConfirmStart", "AutoConfirmStart", "AutoCloseSurvey")
+MESSAGE_PAIRS = (("EOSMessage", "EOSMessageLibrary"), ("InactiveMessage", "InactiveMessageLibrary"),
+                 ("ThankYouEmailMessage", "ThankYouEmailMessageLibrary"),
+                 ("ValidationMessage", "ValidationMessageLibrary"))
+PLACEHOLDER = re.compile(r"^(ASC_)?X+$")
+
+
+class Report:
+    def __init__(self):
+        self.errors, self.warnings = [], []
+
+    def error(self, msg):
+        self.errors.append(msg)
+
+    def warn(self, msg):
+        self.warnings.append(msg)
+
+
+def walk_strings(node, path=""):
+    """Yield (path, string) for every string value in a JSON tree."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from walk_strings(v, f"{path}.{k}")
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from walk_strings(v, f"{path}[{i}]")
+    elif isinstance(node, str):
+        yield path, node
+
+
+def walk_flow(item, depth=0, inside_auth=False):
+    """Yield (flow_item, depth, inside_authenticator) depth-first, in display order."""
+    yield item, depth, inside_auth
+    child_auth = inside_auth or item.get("Type") == "Authenticator"
+    for child in item.get("Flow", []) or []:
+        yield from walk_flow(child, depth + 1, child_auth)
+
+
+def blocks_of(bl_payload, rep, fresh):
+    if isinstance(bl_payload, list):
+        return list(bl_payload)
+    if isinstance(bl_payload, dict):
+        if fresh:
+            rep.error("BL.Payload is a keyed map; generate the array form for fresh files")
+        return [bl_payload[k] for k in sorted(bl_payload, key=lambda k: int(k) if k.isdigit() else 0)]
+    rep.error("BL.Payload is neither an array nor a keyed map")
+    return []
+
+
+def choice_keys(payload):
+    choices = payload.get("Choices")
+    if isinstance(choices, dict):
+        return set(choices)
+    return set()
+
+
+def max_int(keys):
+    nums = [int(k) for k in keys if str(k).isdigit()]
+    return max(nums) if nums else 0
+
+
+def validate(doc, fresh=False):
+    rep = Report()
+    if not isinstance(doc, dict) or "SurveyEntry" not in doc or "SurveyElements" not in doc:
+        rep.error("top level must hold SurveyEntry and SurveyElements")
+        return rep
+    entry, elements = doc["SurveyEntry"], doc["SurveyElements"]
+
+    # --- SurveyEntry -----------------------------------------------------
+    sv = entry.get("SurveyID", "")
+    if not re.fullmatch(f"SV_{ID15}", sv or ""):
+        rep.error(f"SurveyEntry.SurveyID {sv!r} is not SV_ + 15 alphanumerics")
+    for key in ("SurveyOwnerID", "CreatorID"):
+        if not re.fullmatch(f"UR_{ID15}", entry.get(key) or ""):
+            rep.error(f"SurveyEntry.{key} must be UR_ + 15 alphanumerics, never blank")
+    if fresh and entry.get("SurveyBrandID") != "qualtrics":
+        rep.error("fresh file: SurveyBrandID should be the neutral 'qualtrics'")
+
+    by_type = {}
+    for el in elements:
+        by_type.setdefault(el.get("Element"), []).append(el)
+        if el.get("SurveyID") != sv:
+            rep.error(f"element {el.get('Element')} {el.get('PrimaryAttribute')} carries SurveyID "
+                      f"{el.get('SurveyID')!r}, expected {sv!r}")
+    for need in ("BL", "FL", "QC", "RS", "SO", "STAT"):
+        if len(by_type.get(need, [])) != 1:
+            rep.error(f"need exactly one {need} element, found {len(by_type.get(need, []))}")
+    for soft in ("PROJ", "SCO"):
+        if soft not in by_type:
+            rep.warn(f"no {soft} element (real exports always carry one)")
+    if fresh and "PL" in by_type:
+        rep.error("fresh file: omit PL; Qualtrics mints the preview link on import")
+    if rep.errors:
+        return rep
+
+    rs = by_type["RS"][0]
+    if entry.get("SurveyActiveResponseSet") != rs.get("PrimaryAttribute"):
+        rep.error("SurveyActiveResponseSet does not match the RS element's PrimaryAttribute")
+
+    # --- SQ ----------------------------------------------------------------
+    questions = {}
+    tags = {}
+    for el in by_type.get("SQ", []):
+        p = el.get("Payload") or {}
+        qid = el.get("PrimaryAttribute")
+        if qid in questions:
+            rep.error(f"duplicate SQ {qid}")
+        if p.get("QuestionID") != qid:
+            rep.error(f"SQ {qid}: Payload.QuestionID is {p.get('QuestionID')!r}")
+        questions[qid] = p
+        tag = p.get("DataExportTag")
+        if tag in tags:
+            rep.warn(f"DataExportTag {tag!r} used by {tags[tag]} and {qid}")
+        tags[tag] = qid
+
+    qc = by_type["QC"][0].get("SecondaryAttribute")
+    if qc != str(len(questions)):
+        rep.error(f"QC.SecondaryAttribute is {qc!r}; SQ count (trashed included) is {len(questions)}")
+
+    # --- BL ----------------------------------------------------------------
+    blocks = blocks_of(by_type["BL"][0].get("Payload"), rep, fresh)
+    block_ids, trash_ids = {}, set()
+    placed = {}
+    defaults = 0
+    for b in blocks:
+        bid = b.get("ID", "")
+        pattern = f"BL_{ID15}" if fresh else r"BL_[A-Za-z0-9]+"
+        if not re.fullmatch(pattern, bid):
+            rep.error(f"block ID {bid!r} does not match {pattern}")
+        if bid in block_ids:
+            rep.error(f"duplicate block ID {bid}")
+        block_ids[bid] = b
+        if b.get("Type") == "Trash":
+            trash_ids.add(bid)
+        if b.get("Type") == "Default":
+            defaults += 1
+        for be in b.get("BlockElements", []) or []:
+            if be.get("Type") != "Question":
+                continue
+            q = be.get("QuestionID")
+            if q not in questions:
+                rep.error(f"block {bid} references missing question {q}")
+            if q in placed:
+                rep.error(f"{q} sits in two blocks ({placed[q]} and {bid})")
+            placed[q] = bid
+    if defaults != 1:
+        rep.warn(f"expected one Default block, found {defaults}")
+    if len(trash_ids) > 1:
+        rep.error("more than one Trash block")
+    for q in questions:
+        if q not in placed:
+            rep.error(f"{q} is orphaned: in no block (not even Trash)")
+
+    # --- FL ----------------------------------------------------------------
+    root = by_type["FL"][0].get("Payload") or {}
+    if root.get("Type") != "Root" or root.get("FlowID") != "FL_1":
+        rep.error("FL root must be Type Root with FlowID FL_1")
+    seen_fids = {}
+    flow_blocks = []
+    auth_items = []
+    for item, depth, inside_auth in walk_flow(root):
+        fid = item.get("FlowID", "")
+        if not re.fullmatch(r"FL_\d+", fid):
+            rep.error(f"bad FlowID {fid!r}")
+            continue
+        if fid in seen_fids:
+            rep.error(f"duplicate FlowID {fid}")
+        seen_fids[fid] = item
+        t = item.get("Type")
+        if t in ("Block", "Standard"):
+            bid = item.get("ID")
+            flow_blocks.append(bid)
+            if bid not in block_ids:
+                rep.error(f"flow {fid} points at missing block {bid}")
+            elif bid in trash_ids:
+                rep.error(f"flow {fid} points at the Trash block")
+            else:
+                want = "Standard" if "SubType" in block_ids[bid] else "Block"
+                if t != want:
+                    rep.warn(f"flow {fid} is Type {t!r}; block {bid} "
+                             f"{'has' if want == 'Standard' else 'lacks'} SubType, exports spell it {want!r}")
+        if t == "Authenticator":
+            auth_items.append((item, depth))
+    if root.get("Type") == "Root":
+        count = (root.get("Properties") or {}).get("Count")
+        top = max(int(f[3:]) for f in seen_fids) if seen_fids else 0
+        if count != top:
+            rep.error(f"FL Properties.Count is {count!r}; max FlowID is {top}")
+    for bid in block_ids:
+        if bid not in trash_ids and bid not in flow_blocks:
+            rep.warn(f"block {bid} ({block_ids[bid].get('Description')!r}) is not in the flow; "
+                     "its questions never show")
+
+    # question display order, for carry-forward checks
+    order = []
+    for bid in flow_blocks:
+        for be in (block_ids.get(bid) or {}).get("BlockElements", []) or []:
+            if be.get("QuestionID") not in order:
+                order.append(be.get("QuestionID"))
+
+    # --- per-question payload checks ---------------------------------------
+    for qid, p in questions.items():
+        keys = choice_keys(p)
+        dyn = p.get("DynamicChoices")
+        co = p.get("ChoiceOrder")
+        if isinstance(co, list):
+            stray = [str(c) for c in co if str(c) not in keys]
+            if stray and not dyn:
+                rep.error(f"{qid}: ChoiceOrder lists unknown choice IDs {stray}")
+        nci = p.get("NextChoiceId")
+        if keys and isinstance(nci, int) and nci <= max_int(keys):
+            rep.error(f"{qid}: NextChoiceId {nci} must exceed max choice ID {max_int(keys)}")
+        answers = p.get("Answers")
+        if isinstance(answers, dict):
+            nai = p.get("NextAnswerId")
+            if isinstance(nai, int) and nai <= max_int(answers):
+                rep.error(f"{qid}: NextAnswerId {nai} must exceed max answer ID {max_int(answers)}")
+            ao = p.get("AnswerOrder") or []
+            stray = [str(a) for a in ao if str(a) not in answers]
+            if stray:
+                rep.error(f"{qid}: AnswerOrder lists unknown answer IDs {stray}")
+        if dyn:
+            m = re.match(r"q://(QID\d+)/", dyn.get("Locator", ""))
+            src = m.group(1) if m else None
+            if src not in questions:
+                rep.error(f"{qid}: DynamicChoices source {src!r} does not exist")
+            else:
+                if src in order and qid in order and order.index(src) > order.index(qid):
+                    rep.error(f"{qid}: carry-forward source {src} shows after it")
+                src_keys = {f"x{k}" for k in choice_keys(questions[src])}
+                for field in ("RecodeValues", "VariableNaming"):
+                    extra = set(p.get(field) or {}) - src_keys
+                    if extra:
+                        rep.error(f"{qid}: {field} keys {sorted(extra)} are not x + a {src} choice ID")
+        else:
+            labels = keys if p.get("QuestionType") != "Matrix" else set(answers or {})
+            for field in ("RecodeValues", "VariableNaming"):
+                extra = set(p.get(field) or {}) - labels
+                if extra and labels:
+                    rep.error(f"{qid}: {field} keys {sorted(extra)} match no choice/answer")
+        fr = ((p.get("Validation") or {}).get("Settings") or {}).get("ForceResponse")
+        if fr is not None and fr not in ("ON", "OFF"):
+            rep.error(f"{qid}: ForceResponse must be the string 'ON' or 'OFF'")
+        if fresh and "QuestionJS" in p and not p["QuestionJS"].lstrip().startswith("Qualtrics.SurveyEngine"):
+            rep.warn(f"{qid}: QuestionJS does not start with a Qualtrics.SurveyEngine hook")
+
+    # --- references anywhere in the file -----------------------------------
+    for path, s in walk_strings(doc):
+        for qid, rest in re.findall(r"q:(?:\\?/){2}(QID\d+)((?:\\?/)[A-Za-z]+(?:\\?/)?\d*)?", s):
+            if qid not in questions:
+                rep.error(f"{path}: reference to missing {qid}")
+                continue
+            m = re.search(r"SelectableChoice(?:\\?/)(\d+)", rest or "")
+            if m and questions[qid].get("Choices") and m.group(1) not in choice_keys(questions[qid]):
+                rep.error(f"{path}: {qid} has no choice {m.group(1)}")
+        if fresh and re.search(r"\bMS_[A-Za-z0-9]{15}\b", s):
+            rep.error(f"{path}: message-library ID in a fresh file; it will dangle in another account")
+
+    # --- SO ----------------------------------------------------------------
+    so = by_type["SO"][0].get("Payload") or {}
+    for key in STRING_BOOL_SO_KEYS:
+        if key in so and not isinstance(so[key], str):
+            rep.error(f"SO.{key} must be a string ('true'/'false'), got {type(so[key]).__name__}")
+    for key in REAL_BOOL_SO_KEYS:
+        if key in so and not isinstance(so[key], bool):
+            rep.error(f"SO.{key} must be a JSON boolean, got {type(so[key]).__name__}")
+    for msg, lib in MESSAGE_PAIRS:
+        if so.get(msg) and str(so[msg]).startswith("MS_") and not so.get(lib):
+            rep.error(f"SO.{msg} names a library message but SO.{lib} is empty")
+    footer = so.get("Footer") or ""
+    if footer.count("<script") > footer.count("</script>"):
+        rep.warn(f"SO.Footer has an unclosed <script> ({len(footer)} chars); exports have been seen "
+                 "cut mid-script, so check it on the live survey")
+    if fresh:
+        skin = so.get("Skin") or {}
+        if so.get("SkinLibrary") != "qualtrics" or skin.get("brandingId") is not None:
+            rep.error("fresh file: use SkinLibrary 'qualtrics' and Skin.brandingId null")
+
+    # --- SSO authenticators ------------------------------------------------
+    first = (root.get("Flow") or [{}])[0] if root.get("Flow") else {}
+    for item, depth in auth_items:
+        sso = item.get("SSOOptions") or {}
+        fid = item.get("FlowID")
+        if PLACEHOLDER.match(sso.get("SSOID") or ""):
+            rep.warn(f"{fid}: SSOID is a placeholder; after import, Survey flow -> authenticator: switch SSO Type "
+                     "to another value, save, switch back, select your connection, save, publish")
+        key = (sso.get("token") or {}).get("Key")
+        if key and not PLACEHOLDER.match(key):
+            rep.warn(f"{fid}: SSO token key present; treat this file as a secret")
+        if item is first:
+            rep.warn(f"{fid}: authenticator is the very first flow element; respondents bounce to the IdP "
+                     "before any page renders (fragile in in-app browsers). Put a welcome block first")
+        if not item.get("Flow"):
+            rep.error(f"{fid}: authenticator has an empty Flow; nothing is protected")
+    return rep
+
+
+def main(argv):
+    fresh = "--fresh" in argv
+    files = [a for a in argv if a != "--fresh"]
+    if not files:
+        print(__doc__.strip())
+        return 2
+    failed = False
+    for path in files:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh)
+        except (OSError, ValueError) as exc:
+            print(f"{path}: ERROR cannot load JSON: {exc}")
+            failed = True
+            continue
+        rep = validate(doc, fresh=fresh)
+        for e in rep.errors:
+            print(f"{path}: ERROR {e}")
+        for w in rep.warnings:
+            print(f"{path}: WARN {w}")
+        print(f"{path}: {'FAIL' if rep.errors else 'OK'} ({len(rep.errors)} errors, {len(rep.warnings)} warnings)")
+        failed = failed or bool(rep.errors)
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+
+===============================================================================
+FILE: skills/survey-qsf/samples/session-availability-sso.qsf
+===============================================================================
+{
+ "SurveyEntry": {
+  "SurveyID": "SV_L2m69I7wDdQGnMo",
+  "SurveyName": "Sample: session availability (SSO)",
+  "SurveyDescription": "SSO sample: sign in, then say for each slot whether and how you can join.",
+  "SurveyOwnerID": "UR_6sFSYnvCeqmkfCX",
+  "SurveyBrandID": "qualtrics",
+  "DivisionID": null,
+  "SurveyLanguage": "EN",
+  "SurveyActiveResponseSet": "RS_IxmEYupOYzBneBD",
+  "SurveyStatus": "Inactive",
+  "SurveyStartDate": "0000-00-00 00:00:00",
+  "SurveyExpirationDate": "0000-00-00 00:00:00",
+  "SurveyCreationDate": "2026-10-26 12:00:00",
+  "CreatorID": "UR_6sFSYnvCeqmkfCX",
+  "LastModified": "2026-10-26 12:00:00",
+  "LastAccessed": "0000-00-00 00:00:00",
+  "LastActivated": "0000-00-00 00:00:00",
+  "Deleted": null
+ },
+ "SurveyElements": [
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "BL",
+   "PrimaryAttribute": "Survey Blocks",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": [
+    {
+     "Type": "Default",
+     "Description": "Welcome (shown before sign-in)",
+     "ID": "BL_tnhP0NRvQ24rzYy",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID1"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Identity check and slot grid",
+     "ID": "BL_oBezVQAa3DnIgwY",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID2"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID3"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID4"
+      }
+     ]
+    },
+    {
+     "Type": "Trash",
+     "Description": "Trash / Unused Questions",
+     "ID": "BL_bxTxaqK0jcBlreW"
+    }
+   ]
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "FL",
+   "PrimaryAttribute": "Survey Flow",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "Flow": [
+     {
+      "Type": "Block",
+      "ID": "BL_tnhP0NRvQ24rzYy",
+      "FlowID": "FL_2",
+      "Autofill": []
+     },
+     {
+      "Type": "Authenticator",
+      "FlowID": "FL_3",
+      "FilterDataFields": true,
+      "SSOOptions": {
+       "respondentMap": [
+        {
+         "key": "urn:oid:2.5.4.42",
+         "value": "FirstName"
+        },
+        {
+         "key": "urn:oid:2.5.4.4",
+         "value": "LastName"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.3",
+         "value": "Email"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.1",
+         "value": "UserID"
+        }
+       ],
+       "Type": "Shibboleth",
+       "token": {
+        "EncryptionMethod": "3DES",
+        "MacMethod": "sha512",
+        "Leeway": 300,
+        "Key": "XXXXXXXXXXXXXXXX"
+       },
+       "ldap": {
+        "Hostname": "ldap://",
+        "Port": "389",
+        "EmailField": "mail",
+        "Filter": "(sAMAccountName=%1)",
+        "FirstNameField": "givenname",
+        "LastNameField": "sn",
+        "ExternalDataReferenceField": ""
+       },
+       "UsePanel": "No",
+       "CaptureRespondentInfo": "Yes",
+       "UseSSO": "Yes",
+       "SSOID": "ASC_XXXXXXXXXXXXXXX",
+       "cas": []
+      },
+      "Options": {
+       "maxAttempts": 3,
+       "questionText": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH04"
+        }
+       },
+       "authenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH02"
+        }
+       },
+       "failedAuthenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH05"
+        }
+       },
+       "allowRetake": true,
+       "loadExistingSession": false,
+       "reauthenticateSession": false
+      },
+      "Flow": [
+       {
+        "Type": "Block",
+        "ID": "BL_oBezVQAa3DnIgwY",
+        "FlowID": "FL_4",
+        "Autofill": []
+       }
+      ]
+     }
+    ],
+    "Properties": {
+     "Count": 4
+    },
+    "FlowID": "FL_1",
+    "Type": "Root"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "PROJ",
+   "PrimaryAttribute": "CORE",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": "1.1.0",
+   "Payload": {
+    "ProjectCategory": "CORE",
+    "SchemaVersion": "1.1.0"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "QC",
+   "PrimaryAttribute": "Survey Question Count",
+   "SecondaryAttribute": "4",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "RS",
+   "PrimaryAttribute": "RS_IxmEYupOYzBneBD",
+   "SecondaryAttribute": "Default Response Set",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SCO",
+   "PrimaryAttribute": "Scoring",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "ScoringCategories": [],
+    "ScoringCategoryGroups": [],
+    "ScoringSummaryCategory": null,
+    "ScoringSummaryAfterQuestions": 0,
+    "ScoringSummaryAfterSurvey": 0,
+    "DefaultScoringCategory": null,
+    "AutoScoringCategory": null
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SO",
+   "PrimaryAttribute": "Survey Options",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "BackButton": "false",
+    "SaveAndContinue": "false",
+    "SurveyProtection": "PublicSurvey",
+    "BallotBoxStuffingPrevention": "false",
+    "NoIndex": "Yes",
+    "SecureResponseFiles": "true",
+    "SurveyExpiration": "None",
+    "SurveyTermination": "DefaultMessage",
+    "Header": "",
+    "Footer": "",
+    "ProgressBarDisplay": "None",
+    "PartialData": "+1 week",
+    "ValidationMessage": "",
+    "PreviousButton": "",
+    "NextButton": "Continue",
+    "SurveyTitle": "Slot availability",
+    "SkinLibrary": "qualtrics",
+    "SkinType": "templated",
+    "Skin": {
+     "brandingId": null,
+     "templateId": "*base",
+     "overrides": null
+    },
+    "NewScoring": 1,
+    "SurveyMetaDescription": "Slot availability: remote or on site.",
+    "ProtectSelectionIds": true,
+    "CustomStyles": {
+     "customCSS": "#SkinContent{max-width:720px;margin:0 auto}\n.QuestionText{line-height:1.5}\n.ChoiceStructure li{background:#fff!important;border:1px solid #d9e1e8;border-radius:6px;margin:6px 0;padding:10px 14px}\n.ChoiceStructure li:has(input:checked),.ChoiceStructure li:hover{border-color:#0f766e}\n.ChoiceStructure label{background:#fff!important;color:#1f2a37;font-weight:600}\n.QuestionBody input:is([type=checkbox],[type=radio]){accent-color:#0f766e}\n#NextButton{background:#0f766e;border-radius:4px;padding:11px 28px}\n@media(max-width:520px){.card{padding:16px!important}}"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID1",
+   "SecondaryAttribute": "Planning Pick your slots Next, you mark for each one-hour slot whether you can make it and in wha...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Planning</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Pick your slots</h2><div style=\"font-size:16px;color:#55606e\">Next, you mark for each one-hour slot whether you can make it and in what way. First you sign in with your work account, so we know who answered. All times are UTC.</div></div>",
+    "DataExportTag": "intro",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Planning Pick your slots Next, you mark for each one-hour slot whether you can make it and in wha...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID1"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID2",
+   "SecondaryAttribute": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Account confirmed</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Is this you?</h2><div style=\"font-size:16px;color:#55606e\"><div style=\"margin-top:6px;padding:12px 14px;border:1px dashed #0f766e;background:#f4f7f9;border-radius:4px\"><span style=\"font-size:13px\">Your answers are linked to</span><br><strong style=\"color:#1f2a37\">${e://Field/FirstName} ${e://Field/LastName}</strong><br>${e://Field/Email}</div></div></div>",
+    "DataExportTag": "identity_card",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID2"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID3",
+   "SecondaryAttribute": "For each slot, tell us whether and how you can join.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "For each slot, tell us whether and how you can join.",
+    "DataExportTag": "slot_choice",
+    "QuestionType": "Matrix",
+    "Selector": "Likert",
+    "SubSelector": "SingleAnswer",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "TextPosition": "inline",
+     "ChoiceColumnWidth": 45,
+     "RepeatHeaders": "none",
+     "WhiteSpace": "OFF",
+     "MobileFirst": true
+    },
+    "QuestionDescription": "For each slot, tell us whether and how you can join.",
+    "DefaultChoices": false,
+    "Choices": {
+     "1": {
+      "Display": "Tuesday 6 April 2027, 10:00-11:00"
+     },
+     "2": {
+      "Display": "Tuesday 6 April 2027, 13:30-14:30"
+     },
+     "3": {
+      "Display": "Tuesday 6 April 2027, 15:00-16:00"
+     },
+     "4": {
+      "Display": "Wednesday 7 April 2027, 10:00-11:00"
+     },
+     "5": {
+      "Display": "Wednesday 7 April 2027, 13:30-14:30"
+     },
+     "6": {
+      "Display": "Wednesday 7 April 2027, 15:00-16:00"
+     },
+     "7": {
+      "Display": "Friday 9 April 2027, 10:00-11:00"
+     },
+     "8": {
+      "Display": "Friday 9 April 2027, 13:30-14:30"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8"
+    ],
+    "Answers": {
+     "1": {
+      "Display": "No"
+     },
+     "2": {
+      "Display": "Remote"
+     },
+     "3": {
+      "Display": "On site"
+     },
+     "4": {
+      "Display": "Either"
+     }
+    },
+    "AnswerOrder": [
+     "1",
+     "2",
+     "3",
+     "4"
+    ],
+    "RecodeValues": {
+     "1": "1",
+     "2": "2",
+     "3": "3",
+     "4": "4"
+    },
+    "VariableNaming": {
+     "1": "NO",
+     "2": "REMOTE",
+     "3": "ONSITE",
+     "4": "FLEX"
+    },
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 9,
+    "NextAnswerId": 5,
+    "GradingData": [],
+    "ChoiceDataExportTags": false,
+    "QuestionID": "QID3"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID4",
+   "SecondaryAttribute": "Notes (optional) Optional remarks for the organizers.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Notes (optional)</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Optional remarks for the organizers.</p>",
+    "DataExportTag": "comment",
+    "QuestionType": "TE",
+    "Selector": "ML",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "InputWidth": 680,
+     "InputHeight": 160
+    },
+    "QuestionDescription": "Notes (optional) Optional remarks for the organizers.",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "OFF",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID4"
+   }
+  },
+  {
+   "SurveyID": "SV_L2m69I7wDdQGnMo",
+   "Element": "STAT",
+   "PrimaryAttribute": "Survey Statistics",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "MobileCompatible": true,
+    "ID": "Survey Statistics"
+   }
+  }
+ ]
+}
+
+===============================================================================
+FILE: skills/survey-qsf/samples/ranked-preferences-sso.qsf
+===============================================================================
+{
+ "SurveyEntry": {
+  "SurveyID": "SV_WyPEA3mmRzdBC2C",
+  "SurveyName": "Sample: ranked preferences (SSO)",
+  "SurveyDescription": "SSO sample: opt in, select three options, rank them, comment.",
+  "SurveyOwnerID": "UR_c5HumpFONW2PHm3",
+  "SurveyBrandID": "qualtrics",
+  "DivisionID": null,
+  "SurveyLanguage": "EN",
+  "SurveyActiveResponseSet": "RS_zuEiBDVT1TQcHpW",
+  "SurveyStatus": "Inactive",
+  "SurveyStartDate": "0000-00-00 00:00:00",
+  "SurveyExpirationDate": "0000-00-00 00:00:00",
+  "SurveyCreationDate": "2026-10-26 12:00:00",
+  "CreatorID": "UR_c5HumpFONW2PHm3",
+  "LastModified": "2026-10-26 12:00:00",
+  "LastAccessed": "0000-00-00 00:00:00",
+  "LastActivated": "0000-00-00 00:00:00",
+  "Deleted": null
+ },
+ "SurveyElements": [
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "BL",
+   "PrimaryAttribute": "Survey Blocks",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": [
+    {
+     "Type": "Default",
+     "Description": "Welcome (shown before sign-in)",
+     "ID": "BL_qCE33Fr9c75l3OX",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID1"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Identity check and opt-in",
+     "ID": "BL_gcyqaln6mhwi4oS",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID2"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID3"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Choose 3 options",
+     "ID": "BL_YPmBpt5Pwmtsv3D",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID4"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Rank the 3 options",
+     "ID": "BL_XpwXdNmYyzHWKww",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID5"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "SubType": "",
+     "Description": "Comment",
+     "ID": "BL_AkpJ4w4whmLuaf9",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID6"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Opt out",
+     "ID": "BL_QGyKugs6Vkq3MRF",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID7"
+      }
+     ]
+    },
+    {
+     "Type": "Trash",
+     "Description": "Trash / Unused Questions",
+     "ID": "BL_9TtPP84iJlQJDiC"
+    }
+   ]
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "FL",
+   "PrimaryAttribute": "Survey Flow",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "Flow": [
+     {
+      "Type": "Block",
+      "ID": "BL_qCE33Fr9c75l3OX",
+      "FlowID": "FL_2",
+      "Autofill": []
+     },
+     {
+      "Type": "Authenticator",
+      "FlowID": "FL_3",
+      "FilterDataFields": true,
+      "SSOOptions": {
+       "respondentMap": [
+        {
+         "key": "urn:oid:2.5.4.42",
+         "value": "FirstName"
+        },
+        {
+         "key": "urn:oid:2.5.4.4",
+         "value": "LastName"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.3",
+         "value": "Email"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.1",
+         "value": "UserID"
+        }
+       ],
+       "Type": "Shibboleth",
+       "token": {
+        "EncryptionMethod": "3DES",
+        "MacMethod": "sha512",
+        "Leeway": 300,
+        "Key": "XXXXXXXXXXXXXXXX"
+       },
+       "ldap": {
+        "Hostname": "ldap://",
+        "Port": "389",
+        "EmailField": "mail",
+        "Filter": "(sAMAccountName=%1)",
+        "FirstNameField": "givenname",
+        "LastNameField": "sn",
+        "ExternalDataReferenceField": ""
+       },
+       "UsePanel": "No",
+       "CaptureRespondentInfo": "Yes",
+       "UseSSO": "Yes",
+       "SSOID": "ASC_XXXXXXXXXXXXXXX",
+       "cas": []
+      },
+      "Options": {
+       "maxAttempts": 3,
+       "questionText": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH04"
+        }
+       },
+       "authenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH02"
+        }
+       },
+       "failedAuthenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH05"
+        }
+       },
+       "allowRetake": true,
+       "loadExistingSession": false,
+       "reauthenticateSession": false
+      },
+      "Flow": [
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_4",
+        "EmbeddedData": [
+         {
+          "Description": "OptIn",
+          "Type": "Custom",
+          "Field": "OptIn",
+          "VariableType": "Nominal",
+          "DataVisibility": [],
+          "Value": ""
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       },
+       {
+        "Type": "Block",
+        "ID": "BL_gcyqaln6mhwi4oS",
+        "FlowID": "FL_5",
+        "Autofill": []
+       },
+       {
+        "Type": "Branch",
+        "FlowID": "FL_6",
+        "Description": "Opt in — pick 3, order, notes",
+        "BranchLogic": {
+         "0": {
+          "0": {
+           "LogicType": "Question",
+           "QuestionID": "QID3",
+           "QuestionIsInLoop": "no",
+           "ChoiceLocator": "q://QID3/SelectableChoice/1",
+           "Operator": "Selected",
+           "QuestionIDFromLocator": "QID3",
+           "LeftOperand": "q://QID3/SelectableChoice/1",
+           "Type": "Expression",
+           "Description": "If QID3 choice 1 is selected"
+          },
+          "Type": "If"
+         },
+         "Type": "BooleanExpression"
+        },
+        "Flow": [
+         {
+          "Type": "EmbeddedData",
+          "FlowID": "FL_7",
+          "EmbeddedData": [
+           {
+            "Description": "OptIn",
+            "Type": "Custom",
+            "Field": "OptIn",
+            "VariableType": "Nominal",
+            "DataVisibility": [],
+            "Value": "yes"
+           }
+          ],
+          "Options": {
+           "VarTypes": "Yes"
+          }
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_YPmBpt5Pwmtsv3D",
+          "FlowID": "FL_8",
+          "Autofill": []
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_XpwXdNmYyzHWKww",
+          "FlowID": "FL_9",
+          "Autofill": []
+         },
+         {
+          "Type": "Standard",
+          "ID": "BL_AkpJ4w4whmLuaf9",
+          "FlowID": "FL_10",
+          "Autofill": []
+         }
+        ]
+       },
+       {
+        "Type": "Branch",
+        "FlowID": "FL_11",
+        "Description": "Opt out",
+        "BranchLogic": {
+         "0": {
+          "0": {
+           "LogicType": "Question",
+           "QuestionID": "QID3",
+           "QuestionIsInLoop": "no",
+           "ChoiceLocator": "q://QID3/SelectableChoice/2",
+           "Operator": "Selected",
+           "QuestionIDFromLocator": "QID3",
+           "LeftOperand": "q://QID3/SelectableChoice/2",
+           "Type": "Expression",
+           "Description": "If QID3 choice 2 is selected"
+          },
+          "Type": "If"
+         },
+         "Type": "BooleanExpression"
+        },
+        "Flow": [
+         {
+          "Type": "EmbeddedData",
+          "FlowID": "FL_12",
+          "EmbeddedData": [
+           {
+            "Description": "OptIn",
+            "Type": "Custom",
+            "Field": "OptIn",
+            "VariableType": "Nominal",
+            "DataVisibility": [],
+            "Value": "no"
+           }
+          ],
+          "Options": {
+           "VarTypes": "Yes"
+          }
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_QGyKugs6Vkq3MRF",
+          "FlowID": "FL_13",
+          "Autofill": []
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "Properties": {
+     "Count": 13
+    },
+    "FlowID": "FL_1",
+    "Type": "Root"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "PROJ",
+   "PrimaryAttribute": "CORE",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": "1.1.0",
+   "Payload": {
+    "ProjectCategory": "CORE",
+    "SchemaVersion": "1.1.0"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "QC",
+   "PrimaryAttribute": "Survey Question Count",
+   "SecondaryAttribute": "7",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "RS",
+   "PrimaryAttribute": "RS_zuEiBDVT1TQcHpW",
+   "SecondaryAttribute": "Default Response Set",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SCO",
+   "PrimaryAttribute": "Scoring",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "ScoringCategories": [],
+    "ScoringCategoryGroups": [],
+    "ScoringSummaryCategory": null,
+    "ScoringSummaryAfterQuestions": 0,
+    "ScoringSummaryAfterSurvey": 0,
+    "DefaultScoringCategory": null,
+    "AutoScoringCategory": null
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SO",
+   "PrimaryAttribute": "Survey Options",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "BackButton": "true",
+    "SaveAndContinue": "false",
+    "SurveyProtection": "PublicSurvey",
+    "BallotBoxStuffingPrevention": "false",
+    "NoIndex": "Yes",
+    "SecureResponseFiles": "true",
+    "SurveyExpiration": "None",
+    "SurveyTermination": "DefaultMessage",
+    "Header": "",
+    "Footer": "",
+    "ProgressBarDisplay": "None",
+    "PartialData": "+1 week",
+    "ValidationMessage": "",
+    "PreviousButton": "",
+    "NextButton": "Continue",
+    "SurveyTitle": "Your preferences",
+    "SkinLibrary": "qualtrics",
+    "SkinType": "templated",
+    "Skin": {
+     "brandingId": null,
+     "templateId": "*base",
+     "overrides": null
+    },
+    "NewScoring": 1,
+    "SurveyMetaDescription": "Pick and order your preferred projects.",
+    "ProtectSelectionIds": true,
+    "CustomStyles": {
+     "customCSS": "#SkinContent{max-width:720px;margin:0 auto}\n.QuestionText{line-height:1.5}\n.ChoiceStructure li{background:#fff!important;border:1px solid #d9e1e8;border-radius:6px;margin:6px 0;padding:10px 14px}\n.ChoiceStructure li:has(input:checked),.ChoiceStructure li:hover{border-color:#0f766e}\n.ChoiceStructure label{background:#fff!important;color:#1f2a37;font-weight:600}\n.QuestionBody input:is([type=checkbox],[type=radio]){accent-color:#0f766e}\n#NextButton{background:#0f766e;border-radius:4px;padding:11px 28px}\n@media(max-width:520px){.card{padding:16px!important}}"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID1",
+   "SecondaryAttribute": "Your picks Which projects appeal to you? After signing in with your work account, you pick 3 of 1...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Your picks</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Which projects appeal to you?</h2><div style=\"font-size:16px;color:#55606e\">After signing in with your work account, you pick <strong>3</strong> of 10 projects and order them, best first. Allow a few minutes.</div></div>",
+    "DataExportTag": "intro",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Your picks Which projects appeal to you? After signing in with your work account, you pick 3 of 1...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID1"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID2",
+   "SecondaryAttribute": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Account confirmed</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Is this you?</h2><div style=\"font-size:16px;color:#55606e\"><div style=\"margin-top:6px;padding:12px 14px;border:1px dashed #0f766e;background:#f4f7f9;border-radius:4px\"><span style=\"font-size:13px\">Your answers are linked to</span><br><strong style=\"color:#1f2a37\">${e://Field/FirstName} ${e://Field/LastName}</strong><br>${e://Field/Email}</div></div></div>",
+    "DataExportTag": "identity_card",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID2"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID3",
+   "SecondaryAttribute": "Submit your picks now?",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Submit your picks now?</h3>",
+    "DataExportTag": "opt_in",
+    "QuestionType": "MC",
+    "Selector": "SAVR",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Submit your picks now?",
+    "Choices": {
+     "1": {
+      "Display": "Yes, let me pick"
+     },
+     "2": {
+      "Display": "Not now"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 3,
+    "NextAnswerId": 1,
+    "QuestionID": "QID3"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID4",
+   "SecondaryAttribute": "Pick three Tick exactly 3 projects. You order them on the next page.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Pick three</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Tick <strong>exactly 3</strong> projects. You order them on the next page.</p>",
+    "DataExportTag": "picked_projects",
+    "QuestionType": "MC",
+    "Selector": "MACOL",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "NumColumns": 2
+    },
+    "QuestionDescription": "Pick three Tick exactly 3 projects. You order them on the next page.",
+    "Choices": {
+     "1": {
+      "Display": "Customer onboarding redesign"
+     },
+     "2": {
+      "Display": "Internal knowledge base"
+     },
+     "3": {
+      "Display": "Data quality dashboard"
+     },
+     "4": {
+      "Display": "Supplier review process"
+     },
+     "5": {
+      "Display": "Accessibility audit"
+     },
+     "6": {
+      "Display": "Mobile app prototype"
+     },
+     "7": {
+      "Display": "Energy use reduction plan"
+     },
+     "8": {
+      "Display": "Volunteering day"
+     },
+     "9": {
+      "Display": "Process automation pilot"
+     },
+     "10": {
+      "Display": "Market scan for a new service"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8",
+     "9",
+     "10"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "ON",
+      "Type": "CustomValidation",
+      "MinChoices": "3",
+      "MaxChoices": "3",
+      "CustomValidation": {
+       "Logic": {
+        "0": {
+         "0": {
+          "ChoiceLocator": "q://QID4/SelectedChoicesCount",
+          "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">Pick three Tick exactly 3 projects. You order them on the next page.</span> <span class=\"LeftOpDesc\">Selected Count</span> <span class=\"OpDesc\">Is Equal to</span> <span class=\"RightOpDesc\"> 3 </span>",
+          "LeftOperand": "q://QID4/SelectedChoicesCount",
+          "LogicType": "Question",
+          "Operator": "EqualTo",
+          "QuestionID": "QID4",
+          "QuestionIDFromLocator": "QID4",
+          "QuestionIsInLoop": "no",
+          "RightOperand": "3",
+          "Type": "Expression"
+         },
+         "Type": "If"
+        },
+        "Type": "BooleanExpression"
+       },
+       "Message": {
+        "description": "Pick exactly 3 projects.",
+        "subMessageID": "VE_CUSTOM_VALIDATION_0"
+       }
+      }
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 11,
+    "NextAnswerId": 1,
+    "QuestionID": "QID4",
+    "QuestionJS": "Qualtrics.SurveyEngine.addOnReady(function () {\n  var MAX = 3;\n  var q = this.getQuestionContainer();\n  var inputs = q.querySelectorAll('input[type=\"checkbox\"]');\n  var status = document.createElement('p');\n  status.setAttribute('aria-live', 'polite');\n  status.style.margin = '8px 0';\n  q.appendChild(status);\n  function refresh() {\n    var picked = 0, i;\n    for (i = 0; i < inputs.length; i++) if (inputs[i].checked) picked++;\n    for (i = 0; i < inputs.length; i++) inputs[i].disabled = !inputs[i].checked && picked >= MAX;\n    status.textContent = picked < MAX\n      ? 'Picked ' + picked + ' of ' + MAX + '. Pick ' + (MAX - picked) + ' more.'\n      : 'Picked ' + MAX + ' of ' + MAX + '. Continue to order them.';\n  }\n  for (var i = 0; i < inputs.length; i++) inputs[i].addEventListener('change', refresh);\n  refresh();\n});",
+    "VariableNaming": {
+     "1": "P01",
+     "2": "P02",
+     "3": "P03",
+     "4": "P04",
+     "5": "P05",
+     "6": "P06",
+     "7": "P07",
+     "8": "P08",
+     "9": "P09",
+     "10": "P10"
+    },
+    "RecodeValues": {
+     "1": "1",
+     "2": "2",
+     "3": "3",
+     "4": "4",
+     "5": "5",
+     "6": "6",
+     "7": "7",
+     "8": "8",
+     "9": "9",
+     "10": "10"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID5",
+   "SecondaryAttribute": "Order your picks Drag to reorder. Top = first choice . To keep the order as shown, move at least ...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Order your picks</h3>\n\n<p style=\"font-family:Arial,sans-serif;color:#55606e\">Drag to reorder. <strong>Top = first choice</strong>.<br>\n<span style=\"font-size:12px\">To keep the order as shown, move at least one item to confirm it (you can put it back).</span></p>",
+    "DataExportTag": "project_order",
+    "QuestionType": "RO",
+    "Selector": "DND",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Order your picks Drag to reorder. Top = first choice . To keep the order as shown, move at least ...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID5",
+    "DynamicChoices": {
+     "DynamicType": "ChoiceGroup",
+     "Locator": "q://QID4/ChoiceGroup/SelectedChoices",
+     "Type": "Dynamic"
+    },
+    "DynamicChoicesData": [],
+    "Choices": [],
+    "RecodeValues": {
+     "x1": "1",
+     "x2": "2",
+     "x3": "3",
+     "x4": "4",
+     "x5": "5",
+     "x6": "6",
+     "x7": "7",
+     "x8": "8",
+     "x9": "9",
+     "x10": "10"
+    },
+    "VariableNaming": {
+     "x1": "P01 — Customer onboarding redesign",
+     "x2": "P02 — Internal knowledge base",
+     "x3": "P03 — Data quality dashboard",
+     "x4": "P04 — Supplier review process",
+     "x5": "P05 — Accessibility audit",
+     "x6": "P06 — Mobile app prototype",
+     "x7": "P07 — Energy use reduction plan",
+     "x8": "P08 — Volunteering day",
+     "x9": "P09 — Process automation pilot",
+     "x10": "P10 — Market scan for a new service"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID6",
+   "SecondaryAttribute": "Notes (optional) Optional remarks for the organizers.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Notes (optional)</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Optional remarks for the organizers.</p>",
+    "DataExportTag": "comment",
+    "QuestionType": "TE",
+    "Selector": "ML",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "InputWidth": 680,
+     "InputHeight": 160
+    },
+    "QuestionDescription": "Notes (optional) Optional remarks for the organizers.",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "OFF",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID6",
+    "DefaultChoices": false
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID7",
+   "SecondaryAttribute": "Not now No problem We'll note that you're skipping. Press Continue to save that. You can join nex...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Not now</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">No problem</h2><div style=\"font-size:16px;color:#55606e\">We'll note that you're skipping. Press <strong>Continue</strong> to save that. You can join next time.</div></div>",
+    "DataExportTag": "opt_out_note",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Not now No problem We'll note that you're skipping. Press Continue to save that. You can join nex...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID7"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "STAT",
+   "PrimaryAttribute": "Survey Statistics",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "MobileCompatible": true,
+    "ID": "Survey Statistics"
+   }
+  }
+ ]
+}
+
+===============================================================================
+FILE: skills/survey-qsf/samples/event-attendance-sso.qsf
+===============================================================================
+{
+ "SurveyEntry": {
+  "SurveyID": "SV_cpVmfK8NqKHzkAE",
+  "SurveyName": "Sample: event attendance (SSO)",
+  "SurveyDescription": "SSO sample: SSO or manual route, one shared form, RSVP yes / no, calendar links.",
+  "SurveyOwnerID": "UR_YL0fqHIXRcM0hSz",
+  "SurveyBrandID": "qualtrics",
+  "DivisionID": null,
+  "SurveyLanguage": "EN",
+  "SurveyActiveResponseSet": "RS_iFs7a0NRArT8con",
+  "SurveyStatus": "Inactive",
+  "SurveyStartDate": "0000-00-00 00:00:00",
+  "SurveyExpirationDate": "0000-00-00 00:00:00",
+  "SurveyCreationDate": "2026-10-26 12:00:00",
+  "CreatorID": "UR_YL0fqHIXRcM0hSz",
+  "LastModified": "2026-10-26 12:00:00",
+  "LastAccessed": "0000-00-00 00:00:00",
+  "LastActivated": "0000-00-00 00:00:00",
+  "Deleted": null
+ },
+ "SurveyElements": [
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "BL",
+   "PrimaryAttribute": "Survey Blocks",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": [
+    {
+     "Type": "Default",
+     "Description": "Event details and registration route",
+     "ID": "BL_vjknLsYgSp0TSHP",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID1"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID2"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Registration form (shared by both routes)",
+     "ID": "BL_6qH9pZU4b4r44Wr",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID3"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID4"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID5"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID6"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID7"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID8"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID9"
+      }
+     ]
+    },
+    {
+     "Type": "Trash",
+     "Description": "Trash / Unused Questions",
+     "ID": "BL_ZSOiY1UweP54Fkr"
+    }
+   ]
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "FL",
+   "PrimaryAttribute": "Survey Flow",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "Flow": [
+     {
+      "Type": "Block",
+      "ID": "BL_vjknLsYgSp0TSHP",
+      "FlowID": "FL_2",
+      "Autofill": []
+     },
+     {
+      "Type": "Branch",
+      "FlowID": "FL_3",
+      "Description": "SSO route — sign in first",
+      "BranchLogic": {
+       "0": {
+        "0": {
+         "LogicType": "Question",
+         "QuestionID": "QID2",
+         "QuestionIsInLoop": "no",
+         "ChoiceLocator": "q://QID2/SelectableChoice/1",
+         "Operator": "Selected",
+         "QuestionIDFromLocator": "QID2",
+         "LeftOperand": "q://QID2/SelectableChoice/1",
+         "Type": "Expression",
+         "Description": "If QID2 choice 1 is selected"
+        },
+        "Type": "If"
+       },
+       "Type": "BooleanExpression"
+      },
+      "Flow": [
+       {
+        "Type": "Authenticator",
+        "FlowID": "FL_4",
+        "FilterDataFields": true,
+        "SSOOptions": {
+         "respondentMap": [
+          {
+           "key": "urn:oid:2.5.4.42",
+           "value": "FirstName"
+          },
+          {
+           "key": "urn:oid:2.5.4.4",
+           "value": "LastName"
+          },
+          {
+           "key": "urn:oid:0.9.2342.19200300.100.1.3",
+           "value": "Email"
+          },
+          {
+           "key": "urn:oid:0.9.2342.19200300.100.1.1",
+           "value": "UserID"
+          }
+         ],
+         "Type": "Shibboleth",
+         "token": {
+          "EncryptionMethod": "3DES",
+          "MacMethod": "sha512",
+          "Leeway": 300,
+          "Key": "XXXXXXXXXXXXXXXX"
+         },
+         "ldap": {
+          "Hostname": "ldap://",
+          "Port": "389",
+          "EmailField": "mail",
+          "Filter": "(sAMAccountName=%1)",
+          "FirstNameField": "givenname",
+          "LastNameField": "sn",
+          "ExternalDataReferenceField": ""
+         },
+         "UsePanel": "No",
+         "CaptureRespondentInfo": "Yes",
+         "UseSSO": "Yes",
+         "SSOID": "ASC_XXXXXXXXXXXXXXX",
+         "cas": []
+        },
+        "Options": {
+         "maxAttempts": 3,
+         "questionText": {
+          "SystemMessage": {
+           "Section": "ErrorCodes",
+           "Message": "EAUTH04"
+          }
+         },
+         "authenticationError": {
+          "SystemMessage": {
+           "Section": "ErrorCodes",
+           "Message": "EAUTH02"
+          }
+         },
+         "failedAuthenticationError": {
+          "SystemMessage": {
+           "Section": "ErrorCodes",
+           "Message": "EAUTH05"
+          }
+         },
+         "allowRetake": true,
+         "loadExistingSession": false,
+         "reauthenticateSession": false
+        },
+        "Flow": [
+         {
+          "Type": "EmbeddedData",
+          "FlowID": "FL_5",
+          "EmbeddedData": [
+           {
+            "Description": "LoginMethod",
+            "Type": "Custom",
+            "Field": "LoginMethod",
+            "VariableType": "Nominal",
+            "Value": "SSO"
+           }
+          ],
+          "Options": {
+           "VarTypes": "Yes"
+          }
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_6qH9pZU4b4r44Wr",
+          "FlowID": "FL_6",
+          "Autofill": []
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "Type": "Branch",
+      "FlowID": "FL_7",
+      "Description": "Manual route — typed identity",
+      "BranchLogic": {
+       "0": {
+        "0": {
+         "LogicType": "Question",
+         "QuestionID": "QID2",
+         "QuestionIsInLoop": "no",
+         "ChoiceLocator": "q://QID2/SelectableChoice/2",
+         "Operator": "Selected",
+         "QuestionIDFromLocator": "QID2",
+         "LeftOperand": "q://QID2/SelectableChoice/2",
+         "Type": "Expression",
+         "Description": "If QID2 choice 2 is selected"
+        },
+        "Type": "If"
+       },
+       "Type": "BooleanExpression"
+      },
+      "Flow": [
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_8",
+        "EmbeddedData": [
+         {
+          "Description": "LoginMethod",
+          "Type": "Custom",
+          "Field": "LoginMethod",
+          "VariableType": "Nominal",
+          "Value": "Manual"
+         },
+         {
+          "Description": "FirstName",
+          "Type": "Custom",
+          "Field": "FirstName",
+          "VariableType": "Nominal",
+          "Value": ""
+         },
+         {
+          "Description": "LastName",
+          "Type": "Custom",
+          "Field": "LastName",
+          "VariableType": "Nominal",
+          "Value": ""
+         },
+         {
+          "Description": "Email",
+          "Type": "Custom",
+          "Field": "Email",
+          "VariableType": "Nominal",
+          "Value": ""
+         },
+         {
+          "Description": "UserID",
+          "Type": "Custom",
+          "Field": "UserID",
+          "VariableType": "Nominal",
+          "Value": ""
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       },
+       {
+        "Type": "Block",
+        "ID": "BL_6qH9pZU4b4r44Wr",
+        "FlowID": "FL_9",
+        "Autofill": []
+       },
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_10",
+        "EmbeddedData": [
+         {
+          "Description": "FirstName",
+          "Type": "Custom",
+          "Field": "FirstName",
+          "VariableType": "Nominal",
+          "Value": "${q://QID4/ChoiceTextEntryValue}"
+         },
+         {
+          "Description": "LastName",
+          "Type": "Custom",
+          "Field": "LastName",
+          "VariableType": "Nominal",
+          "Value": "${q://QID5/ChoiceTextEntryValue}"
+         },
+         {
+          "Description": "Email",
+          "Type": "Custom",
+          "Field": "Email",
+          "VariableType": "Nominal",
+          "Value": "${q://QID6/ChoiceTextEntryValue}"
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       }
+      ]
+     },
+     {
+      "Type": "Branch",
+      "FlowID": "FL_11",
+      "Description": "RSVP yes",
+      "BranchLogic": {
+       "0": {
+        "0": {
+         "LogicType": "Question",
+         "QuestionID": "QID7",
+         "QuestionIsInLoop": "no",
+         "ChoiceLocator": "q://QID7/SelectableChoice/1",
+         "Operator": "Selected",
+         "QuestionIDFromLocator": "QID7",
+         "LeftOperand": "q://QID7/SelectableChoice/1",
+         "Type": "Expression",
+         "Description": "If QID7 choice 1 is selected"
+        },
+        "Type": "If"
+       },
+       "Type": "BooleanExpression"
+      },
+      "Flow": [
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_12",
+        "EmbeddedData": [
+         {
+          "Description": "RsvpStatus",
+          "Type": "Custom",
+          "Field": "RsvpStatus",
+          "VariableType": "Nominal",
+          "Value": "yes"
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       }
+      ]
+     },
+     {
+      "Type": "Branch",
+      "FlowID": "FL_13",
+      "Description": "RSVP no",
+      "BranchLogic": {
+       "0": {
+        "0": {
+         "LogicType": "Question",
+         "QuestionID": "QID7",
+         "QuestionIsInLoop": "no",
+         "ChoiceLocator": "q://QID7/SelectableChoice/2",
+         "Operator": "Selected",
+         "QuestionIDFromLocator": "QID7",
+         "LeftOperand": "q://QID7/SelectableChoice/2",
+         "Type": "Expression",
+         "Description": "If QID7 choice 2 is selected"
+        },
+        "Type": "If"
+       },
+       "Type": "BooleanExpression"
+      },
+      "Flow": [
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_14",
+        "EmbeddedData": [
+         {
+          "Description": "RsvpStatus",
+          "Type": "Custom",
+          "Field": "RsvpStatus",
+          "VariableType": "Nominal",
+          "Value": "no"
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       }
+      ]
+     }
+    ],
+    "Properties": {
+     "Count": 14
+    },
+    "FlowID": "FL_1",
+    "Type": "Root"
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "PROJ",
+   "PrimaryAttribute": "CORE",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": "1.1.0",
+   "Payload": {
+    "ProjectCategory": "CORE",
+    "SchemaVersion": "1.1.0"
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "QC",
+   "PrimaryAttribute": "Survey Question Count",
+   "SecondaryAttribute": "9",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "RS",
+   "PrimaryAttribute": "RS_iFs7a0NRArT8con",
+   "SecondaryAttribute": "Default Response Set",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SCO",
+   "PrimaryAttribute": "Scoring",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "ScoringCategories": [],
+    "ScoringCategoryGroups": [],
+    "ScoringSummaryCategory": null,
+    "ScoringSummaryAfterQuestions": 0,
+    "ScoringSummaryAfterSurvey": 0,
+    "DefaultScoringCategory": null,
+    "AutoScoringCategory": null
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SO",
+   "PrimaryAttribute": "Survey Options",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "BackButton": "false",
+    "SaveAndContinue": "false",
+    "SurveyProtection": "PublicSurvey",
+    "BallotBoxStuffingPrevention": "false",
+    "NoIndex": "Yes",
+    "SecureResponseFiles": "true",
+    "SurveyExpiration": "None",
+    "SurveyTermination": "DefaultMessage",
+    "Header": "",
+    "Footer": "",
+    "ProgressBarDisplay": "None",
+    "PartialData": "+1 week",
+    "ValidationMessage": "",
+    "PreviousButton": "",
+    "NextButton": "Done",
+    "SurveyTitle": "Lunch talk — RSVP",
+    "SkinLibrary": "qualtrics",
+    "SkinType": "templated",
+    "Skin": {
+     "brandingId": null,
+     "templateId": "*base",
+     "overrides": null
+    },
+    "NewScoring": 1,
+    "SurveyMetaDescription": "RSVP for a lunch talk.",
+    "ProtectSelectionIds": true,
+    "CustomStyles": {
+     "customCSS": "#SkinContent{max-width:720px;margin:0 auto}\n.QuestionText{line-height:1.5}\n.ChoiceStructure li{background:#fff!important;border:1px solid #d9e1e8;border-radius:6px;margin:6px 0;padding:10px 14px}\n.ChoiceStructure li:has(input:checked),.ChoiceStructure li:hover{border-color:#0f766e}\n.ChoiceStructure label{background:#fff!important;color:#1f2a37;font-weight:600}\n.QuestionBody input:is([type=checkbox],[type=radio]){accent-color:#0f766e}\n#NextButton{background:#0f766e;border-radius:4px;padding:11px 28px}\n@media(max-width:520px){.card{padding:16px!important}}"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID1",
+   "SecondaryAttribute": "Event Lunch talk Thursday 18 March 2027 12:00–13:00 UTC Room A",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Event</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Lunch talk</h2><div style=\"font-size:16px;color:#55606e\"><div style=\"padding:12px 14px;border-radius:4px;background:#f4f7f9\"><strong>Thursday 18 March 2027</strong><br>12:00–13:00 UTC<br>Room A</div></div></div>",
+    "DataExportTag": "event_card",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Event Lunch talk Thursday 18 March 2027 12:00–13:00 UTC Room A",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID1"
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID2",
+   "SecondaryAttribute": "How do you want to sign up?",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">How do you want to sign up?</h3>",
+    "DataExportTag": "signup_method",
+    "QuestionType": "MC",
+    "Selector": "SAVR",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "How do you want to sign up?",
+    "Choices": {
+     "1": {
+      "Display": "Sign in with my work account (SSO, recommended)"
+     },
+     "2": {
+      "Display": "Sign up without an account"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 3,
+    "NextAnswerId": 1,
+    "QuestionID": "QID2",
+    "DynamicChoicesData": []
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID3",
+   "SecondaryAttribute": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Account confirmed</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Is this you?</h2><div style=\"font-size:16px;color:#55606e\"><div style=\"margin-top:6px;padding:12px 14px;border:1px dashed #0f766e;background:#f4f7f9;border-radius:4px\"><span style=\"font-size:13px\">Your answers are linked to</span><br><strong style=\"color:#1f2a37\">${e://Field/FirstName} ${e://Field/LastName}</strong><br>${e://Field/Email}</div></div></div>",
+    "DataExportTag": "sso_identity",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID3",
+    "DisplayLogic": {
+     "0": {
+      "0": {
+       "ChoiceLocator": "q://QID2/SelectableChoice/1",
+       "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">How do you want to sign up?</span> <span class=\"LeftOpDesc\">Sign in with my work account (SSO, recommended)</span> <span class=\"OpDesc\">Is Selected</span> ",
+       "LeftOperand": "q://QID2/SelectableChoice/1",
+       "LogicType": "Question",
+       "Operator": "Selected",
+       "QuestionID": "QID2",
+       "QuestionIDFromLocator": "QID2",
+       "QuestionIsInLoop": "no",
+       "Type": "Expression"
+      },
+      "Type": "If"
+     },
+     "Type": "BooleanExpression",
+     "inPage": false
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID4",
+   "SecondaryAttribute": "First name",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">First name</h3>",
+    "DataExportTag": "manual_first_name",
+    "QuestionType": "TE",
+    "Selector": "SL",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "First name",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID4",
+    "DisplayLogic": {
+     "0": {
+      "0": {
+       "ChoiceLocator": "q://QID2/SelectableChoice/2",
+       "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">How do you want to sign up?</span> <span class=\"LeftOpDesc\">Sign up without an account</span> <span class=\"OpDesc\">Is Selected</span> ",
+       "LeftOperand": "q://QID2/SelectableChoice/2",
+       "LogicType": "Question",
+       "Operator": "Selected",
+       "QuestionID": "QID2",
+       "QuestionIDFromLocator": "QID2",
+       "QuestionIsInLoop": "no",
+       "Type": "Expression"
+      },
+      "Type": "If"
+     },
+     "Type": "BooleanExpression",
+     "inPage": false
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID5",
+   "SecondaryAttribute": "Last name",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Last name</h3>",
+    "DataExportTag": "manual_last_name",
+    "QuestionType": "TE",
+    "Selector": "SL",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Last name",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID5",
+    "DisplayLogic": {
+     "0": {
+      "0": {
+       "ChoiceLocator": "q://QID2/SelectableChoice/2",
+       "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">How do you want to sign up?</span> <span class=\"LeftOpDesc\">Sign up without an account</span> <span class=\"OpDesc\">Is Selected</span> ",
+       "LeftOperand": "q://QID2/SelectableChoice/2",
+       "LogicType": "Question",
+       "Operator": "Selected",
+       "QuestionID": "QID2",
+       "QuestionIDFromLocator": "QID2",
+       "QuestionIsInLoop": "no",
+       "Type": "Expression"
+      },
+      "Type": "If"
+     },
+     "Type": "BooleanExpression",
+     "inPage": false
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID6",
+   "SecondaryAttribute": "Email address",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Email address</h3>",
+    "DataExportTag": "manual_email",
+    "QuestionType": "TE",
+    "Selector": "SL",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Email address",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "ContentType",
+      "ContentType": "ValidEmail"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID6",
+    "DisplayLogic": {
+     "0": {
+      "0": {
+       "ChoiceLocator": "q://QID2/SelectableChoice/2",
+       "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">How do you want to sign up?</span> <span class=\"LeftOpDesc\">Sign up without an account</span> <span class=\"OpDesc\">Is Selected</span> ",
+       "LeftOperand": "q://QID2/SelectableChoice/2",
+       "LogicType": "Question",
+       "Operator": "Selected",
+       "QuestionID": "QID2",
+       "QuestionIDFromLocator": "QID2",
+       "QuestionIsInLoop": "no",
+       "Type": "Expression"
+      },
+      "Type": "If"
+     },
+     "Type": "BooleanExpression",
+     "inPage": false
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID7",
+   "SecondaryAttribute": "Can you make it?",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Can you make it?</h3>",
+    "DataExportTag": "rsvp",
+    "QuestionType": "MC",
+    "Selector": "SAVR",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Can you make it?",
+    "Choices": {
+     "1": {
+      "Display": "Yes, I'll be there"
+     },
+     "2": {
+      "Display": "No, I can't make it"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 3,
+    "NextAnswerId": 1,
+    "QuestionID": "QID7",
+    "DynamicChoicesData": [],
+    "RecodeValues": {
+     "1": "1",
+     "2": "0"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID8",
+   "SecondaryAttribute": "Notes (optional) Optional remarks for the organizers.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Notes (optional)</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Optional remarks for the organizers.</p>",
+    "DataExportTag": "comments",
+    "QuestionType": "TE",
+    "Selector": "ML",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Notes (optional) Optional remarks for the organizers.",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "OFF",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID8"
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID9",
+   "SecondaryAttribute": "Save the date Add it to your calendar now, whatever you answered above. Google Calendar Outlook D...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\">\n<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Save the date</h3>\n<p style=\"font-family:Arial,sans-serif;color:#55606e\">Add it to your calendar now, whatever you answered above.</p>\n<div><a href=\"https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Lunch+talk&amp;dates=20270318T120000Z%2F20270318T130000Z&amp;ctz=UTC&amp;location=Room+A\" rel=\"noopener\" target=\"_blank\" style=\"display:inline-block;margin:4px 10px 4px 0;padding:10px 16px;border:1px solid #0f766e;border-radius:4px;text-decoration:none;font-weight:600;font-size:15px;background:#0f766e;color:#fff\">Google Calendar</a><a href=\"https://outlook.office.com/calendar/0/deeplink/compose?path=%2Fcalendar%2Faction%2Fcompose&amp;rru=addevent&amp;subject=Lunch+talk&amp;startdt=2027-03-18T12%3A00%3A00Z&amp;enddt=2027-03-18T13%3A00%3A00Z&amp;location=Room+A\" rel=\"noopener\" target=\"_blank\" style=\"display:inline-block;margin:4px 10px 4px 0;padding:10px 16px;border:1px solid #0f766e;border-radius:4px;text-decoration:none;font-weight:600;font-size:15px;background:#fff;color:#0f766e\">Outlook</a><a class=\"ics-link\" download=\"lunch-talk.ics\" href=\"#\" style=\"display:inline-block;margin:4px 10px 4px 0;padding:10px 16px;border:1px solid #0f766e;border-radius:4px;text-decoration:none;font-weight:600;font-size:15px;background:#fff;color:#0f766e\">Download .ics</a></div>\n<p style=\"font-size:13px;color:#55606e\">Then press <strong>Done</strong>.</p>\n</div>",
+    "DataExportTag": "save_the_date",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Save the date Add it to your calendar now, whatever you answered above. Google Calendar Outlook D...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID9",
+    "QuestionJS": "Qualtrics.SurveyEngine.addOnReady(function () {\n  var lines = [\n    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Example Org//Sample//EN', 'METHOD:PUBLISH',\n    'BEGIN:VEVENT', 'UID:lunch-talk-20270318@example.org', 'DTSTAMP:20261026T120000Z',\n    'DTSTART:20270318T120000Z', 'DTEND:20270318T130000Z',\n    'SUMMARY:Lunch talk', 'LOCATION:Room A', 'END:VEVENT', 'END:VCALENDAR'\n  ];\n  var url = URL.createObjectURL(new Blob([lines.join('\\r\\n') + '\\r\\n'], { type: 'text/calendar' }));\n  Array.prototype.forEach.call(this.getQuestionContainer().querySelectorAll('a.ics-link'), function (a) {\n    a.href = url;\n  });\n});"
+   }
+  },
+  {
+   "SurveyID": "SV_cpVmfK8NqKHzkAE",
+   "Element": "STAT",
+   "PrimaryAttribute": "Survey Statistics",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "MobileCompatible": true,
+    "ID": "Survey Statistics"
+   }
+  }
+ ]
+}
+

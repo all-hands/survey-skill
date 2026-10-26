@@ -42,7 +42,7 @@ score to each response; it doesn't stop any participant taking the survey. To
 switch it off anyway: **Survey options › Security › Bot detection**,
 then **Publish**. The live link keeps the old setting until you publish.
 
-### After importing a sample, the link says "Error while determining which SSO connection to use". How do I fix it?
+### After importing a sample, the link says "Error while determining which SSO connection to use". How do I fix it? ([Shibboleth](#Shibboleth))
 
 The sample file only holds a placeholder connection, and the editor can
 show your connection without actually saving it. This fix worked:

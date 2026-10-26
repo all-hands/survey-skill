@@ -9,9 +9,15 @@ New to this? Start with the plain-language guide in
 surveys do, how to import them and how to switch on sign-in. Common questions
 are answered in the [FAQ](instructions/FAQ.md). Indicative screenshots in [`screenshots/`](screenshots/).
 
+## Quick start
+1. Use or upload the distribution file [dist/survey-skill-bundle.txt](dist/survey-skill-bundle.txt) to your AI web service or harness and describe what survey you want
+2. Import the survey into Qualtrics
+3. If SSO is needed, reselect the SSO type to Shibboleth as described in [FAQ](instructions/FAQ.md#Shibboleth)
+
 ## Layout
 
 ```
+Makefile                       shortcuts: make validate | test | bundle | clean
 skills/survey-qsf/
   SKILL.md                     the skill: modes, export quirks, recompute list, SSO essentials
   references/sso.md            authenticator shape, placement, failure modes, diagnosis
@@ -19,6 +25,8 @@ skills/survey-qsf/
   scripts/validate_qsf.py      structural validator (stdlib); --fresh for generated files
   samples/                     three anonymized sample surveys, each with an SSO authenticator
 tests/test_validate_qsf.py     validator + sample tests
+scripts/
+  make_bundle.sh              one-file bundle of all docs + validator + samples (for AI web uploads)
 instructions/                  plain-language guide: import the samples, set up sign-in
   guide.md                     the guide
   FAQ.md                       common questions
@@ -44,11 +52,13 @@ the connection, save and publish.
 
 ## Install the skill
 
-Copy or symlink `skills/survey-qsf/` into your agent's skills folder,
-e.g. for Claude Code:
+Clone the repo, then copy or symlink `skills/survey-qsf/` into your agent's
+skills folder, e.g. for [pi](https://pi.dev/):
 
 ```sh
-ln -s "$PWD/skills/survey-qsf" ~/.claude/skills/survey-qsf
+git clone https://github.com/all-hands/survey-skill.git
+cd survey-skill
+ln -s "$PWD/skills/survey-qsf" ~/.pi/agent/skills/survey-qsf
 ```
 
 ## Validate and test
@@ -57,6 +67,10 @@ ln -s "$PWD/skills/survey-qsf" ~/.claude/skills/survey-qsf
 python3 skills/survey-qsf/scripts/validate_qsf.py skills/survey-qsf/samples/*.qsf --fresh
 python3 -m unittest discover -s tests
 ```
+
+With `make`: `make validate`, `make test`, `make bundle` (one-file bundle for
+AI services that accept a single upload), `make clean` — wrappers for the
+commands above.
 
 One test scans every tracked text file for the words in
 `tests/forbidden_terms.txt` (one regex per line, git-ignored, so it is not
@@ -73,7 +87,7 @@ connection's token key. Keep real exports out of this repo: `exports/` and
 ## Made with AI
 
 The initial skill, validator, tests, sample surveys and guide in this repo were
-created with open-weight AI models.
+created with open-weight AI models. Final polishing was made with a mix of open- and closed-weight models.
 
 ## License and trademarks
 
