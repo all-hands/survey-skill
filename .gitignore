@@ -1,0 +1,5 @@
+exports/
+*.private.qsf
+__pycache__/
+*.pyc
+tests/forbidden_terms.txt

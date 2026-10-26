@@ -1,0 +1,794 @@
+{
+ "SurveyEntry": {
+  "SurveyID": "SV_WyPEA3mmRzdBC2C",
+  "SurveyName": "Sample: ranked preferences (SSO)",
+  "SurveyDescription": "SSO sample: opt in, select three options, rank them, comment.",
+  "SurveyOwnerID": "UR_c5HumpFONW2PHm3",
+  "SurveyBrandID": "qualtrics",
+  "DivisionID": null,
+  "SurveyLanguage": "EN",
+  "SurveyActiveResponseSet": "RS_zuEiBDVT1TQcHpW",
+  "SurveyStatus": "Inactive",
+  "SurveyStartDate": "0000-00-00 00:00:00",
+  "SurveyExpirationDate": "0000-00-00 00:00:00",
+  "SurveyCreationDate": "2026-10-26 12:00:00",
+  "CreatorID": "UR_c5HumpFONW2PHm3",
+  "LastModified": "2026-10-26 12:00:00",
+  "LastAccessed": "0000-00-00 00:00:00",
+  "LastActivated": "0000-00-00 00:00:00",
+  "Deleted": null
+ },
+ "SurveyElements": [
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "BL",
+   "PrimaryAttribute": "Survey Blocks",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": [
+    {
+     "Type": "Default",
+     "Description": "Welcome (shown before sign-in)",
+     "ID": "BL_qCE33Fr9c75l3OX",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID1"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Identity check and opt-in",
+     "ID": "BL_gcyqaln6mhwi4oS",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID2"
+      },
+      {
+       "Type": "Question",
+       "QuestionID": "QID3"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Choose 3 options",
+     "ID": "BL_YPmBpt5Pwmtsv3D",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID4"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Rank the 3 options",
+     "ID": "BL_XpwXdNmYyzHWKww",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID5"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "SubType": "",
+     "Description": "Comment",
+     "ID": "BL_AkpJ4w4whmLuaf9",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID6"
+      }
+     ]
+    },
+    {
+     "Type": "Standard",
+     "Description": "Opt out",
+     "ID": "BL_QGyKugs6Vkq3MRF",
+     "BlockElements": [
+      {
+       "Type": "Question",
+       "QuestionID": "QID7"
+      }
+     ]
+    },
+    {
+     "Type": "Trash",
+     "Description": "Trash / Unused Questions",
+     "ID": "BL_9TtPP84iJlQJDiC"
+    }
+   ]
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "FL",
+   "PrimaryAttribute": "Survey Flow",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "Flow": [
+     {
+      "Type": "Block",
+      "ID": "BL_qCE33Fr9c75l3OX",
+      "FlowID": "FL_2",
+      "Autofill": []
+     },
+     {
+      "Type": "Authenticator",
+      "FlowID": "FL_3",
+      "FilterDataFields": true,
+      "SSOOptions": {
+       "respondentMap": [
+        {
+         "key": "urn:oid:2.5.4.42",
+         "value": "FirstName"
+        },
+        {
+         "key": "urn:oid:2.5.4.4",
+         "value": "LastName"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.3",
+         "value": "Email"
+        },
+        {
+         "key": "urn:oid:0.9.2342.19200300.100.1.1",
+         "value": "UserID"
+        }
+       ],
+       "Type": "Shibboleth",
+       "token": {
+        "EncryptionMethod": "3DES",
+        "MacMethod": "sha512",
+        "Leeway": 300,
+        "Key": "XXXXXXXXXXXXXXXX"
+       },
+       "ldap": {
+        "Hostname": "ldap://",
+        "Port": "389",
+        "EmailField": "mail",
+        "Filter": "(sAMAccountName=%1)",
+        "FirstNameField": "givenname",
+        "LastNameField": "sn",
+        "ExternalDataReferenceField": ""
+       },
+       "UsePanel": "No",
+       "CaptureRespondentInfo": "Yes",
+       "UseSSO": "Yes",
+       "SSOID": "ASC_XXXXXXXXXXXXXXX",
+       "cas": []
+      },
+      "Options": {
+       "maxAttempts": 3,
+       "questionText": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH04"
+        }
+       },
+       "authenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH02"
+        }
+       },
+       "failedAuthenticationError": {
+        "SystemMessage": {
+         "Section": "ErrorCodes",
+         "Message": "EAUTH05"
+        }
+       },
+       "allowRetake": true,
+       "loadExistingSession": false,
+       "reauthenticateSession": false
+      },
+      "Flow": [
+       {
+        "Type": "EmbeddedData",
+        "FlowID": "FL_4",
+        "EmbeddedData": [
+         {
+          "Description": "OptIn",
+          "Type": "Custom",
+          "Field": "OptIn",
+          "VariableType": "Nominal",
+          "DataVisibility": [],
+          "Value": ""
+         }
+        ],
+        "Options": {
+         "VarTypes": "Yes"
+        }
+       },
+       {
+        "Type": "Block",
+        "ID": "BL_gcyqaln6mhwi4oS",
+        "FlowID": "FL_5",
+        "Autofill": []
+       },
+       {
+        "Type": "Branch",
+        "FlowID": "FL_6",
+        "Description": "Opt in — pick 3, order, notes",
+        "BranchLogic": {
+         "0": {
+          "0": {
+           "LogicType": "Question",
+           "QuestionID": "QID3",
+           "QuestionIsInLoop": "no",
+           "ChoiceLocator": "q://QID3/SelectableChoice/1",
+           "Operator": "Selected",
+           "QuestionIDFromLocator": "QID3",
+           "LeftOperand": "q://QID3/SelectableChoice/1",
+           "Type": "Expression",
+           "Description": "If QID3 choice 1 is selected"
+          },
+          "Type": "If"
+         },
+         "Type": "BooleanExpression"
+        },
+        "Flow": [
+         {
+          "Type": "EmbeddedData",
+          "FlowID": "FL_7",
+          "EmbeddedData": [
+           {
+            "Description": "OptIn",
+            "Type": "Custom",
+            "Field": "OptIn",
+            "VariableType": "Nominal",
+            "DataVisibility": [],
+            "Value": "yes"
+           }
+          ],
+          "Options": {
+           "VarTypes": "Yes"
+          }
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_YPmBpt5Pwmtsv3D",
+          "FlowID": "FL_8",
+          "Autofill": []
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_XpwXdNmYyzHWKww",
+          "FlowID": "FL_9",
+          "Autofill": []
+         },
+         {
+          "Type": "Standard",
+          "ID": "BL_AkpJ4w4whmLuaf9",
+          "FlowID": "FL_10",
+          "Autofill": []
+         }
+        ]
+       },
+       {
+        "Type": "Branch",
+        "FlowID": "FL_11",
+        "Description": "Opt out",
+        "BranchLogic": {
+         "0": {
+          "0": {
+           "LogicType": "Question",
+           "QuestionID": "QID3",
+           "QuestionIsInLoop": "no",
+           "ChoiceLocator": "q://QID3/SelectableChoice/2",
+           "Operator": "Selected",
+           "QuestionIDFromLocator": "QID3",
+           "LeftOperand": "q://QID3/SelectableChoice/2",
+           "Type": "Expression",
+           "Description": "If QID3 choice 2 is selected"
+          },
+          "Type": "If"
+         },
+         "Type": "BooleanExpression"
+        },
+        "Flow": [
+         {
+          "Type": "EmbeddedData",
+          "FlowID": "FL_12",
+          "EmbeddedData": [
+           {
+            "Description": "OptIn",
+            "Type": "Custom",
+            "Field": "OptIn",
+            "VariableType": "Nominal",
+            "DataVisibility": [],
+            "Value": "no"
+           }
+          ],
+          "Options": {
+           "VarTypes": "Yes"
+          }
+         },
+         {
+          "Type": "Block",
+          "ID": "BL_QGyKugs6Vkq3MRF",
+          "FlowID": "FL_13",
+          "Autofill": []
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "Properties": {
+     "Count": 13
+    },
+    "FlowID": "FL_1",
+    "Type": "Root"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "PROJ",
+   "PrimaryAttribute": "CORE",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": "1.1.0",
+   "Payload": {
+    "ProjectCategory": "CORE",
+    "SchemaVersion": "1.1.0"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "QC",
+   "PrimaryAttribute": "Survey Question Count",
+   "SecondaryAttribute": "7",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "RS",
+   "PrimaryAttribute": "RS_zuEiBDVT1TQcHpW",
+   "SecondaryAttribute": "Default Response Set",
+   "TertiaryAttribute": null,
+   "Payload": null
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SCO",
+   "PrimaryAttribute": "Scoring",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "ScoringCategories": [],
+    "ScoringCategoryGroups": [],
+    "ScoringSummaryCategory": null,
+    "ScoringSummaryAfterQuestions": 0,
+    "ScoringSummaryAfterSurvey": 0,
+    "DefaultScoringCategory": null,
+    "AutoScoringCategory": null
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SO",
+   "PrimaryAttribute": "Survey Options",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "BackButton": "true",
+    "SaveAndContinue": "false",
+    "SurveyProtection": "PublicSurvey",
+    "BallotBoxStuffingPrevention": "false",
+    "NoIndex": "Yes",
+    "SecureResponseFiles": "true",
+    "SurveyExpiration": "None",
+    "SurveyTermination": "DefaultMessage",
+    "Header": "",
+    "Footer": "",
+    "ProgressBarDisplay": "None",
+    "PartialData": "+1 week",
+    "ValidationMessage": "",
+    "PreviousButton": "",
+    "NextButton": "Continue",
+    "SurveyTitle": "Your preferences",
+    "SkinLibrary": "qualtrics",
+    "SkinType": "templated",
+    "Skin": {
+     "brandingId": null,
+     "templateId": "*base",
+     "overrides": null
+    },
+    "NewScoring": 1,
+    "SurveyMetaDescription": "Pick and order your preferred projects.",
+    "ProtectSelectionIds": true,
+    "CustomStyles": {
+     "customCSS": "#SkinContent{max-width:720px;margin:0 auto}\n.QuestionText{line-height:1.5}\n.ChoiceStructure li{background:#fff!important;border:1px solid #d9e1e8;border-radius:6px;margin:6px 0;padding:10px 14px}\n.ChoiceStructure li:has(input:checked),.ChoiceStructure li:hover{border-color:#0f766e}\n.ChoiceStructure label{background:#fff!important;color:#1f2a37;font-weight:600}\n.QuestionBody input:is([type=checkbox],[type=radio]){accent-color:#0f766e}\n#NextButton{background:#0f766e;border-radius:4px;padding:11px 28px}\n@media(max-width:520px){.card{padding:16px!important}}"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID1",
+   "SecondaryAttribute": "Your picks Which projects appeal to you? After signing in with your work account, you pick 3 of 1...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Your picks</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Which projects appeal to you?</h2><div style=\"font-size:16px;color:#55606e\">After signing in with your work account, you pick <strong>3</strong> of 10 projects and order them, best first. Allow a few minutes.</div></div>",
+    "DataExportTag": "intro",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Your picks Which projects appeal to you? After signing in with your work account, you pick 3 of 1...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID1"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID2",
+   "SecondaryAttribute": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Account confirmed</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">Is this you?</h2><div style=\"font-size:16px;color:#55606e\"><div style=\"margin-top:6px;padding:12px 14px;border:1px dashed #0f766e;background:#f4f7f9;border-radius:4px\"><span style=\"font-size:13px\">Your answers are linked to</span><br><strong style=\"color:#1f2a37\">${e://Field/FirstName} ${e://Field/LastName}</strong><br>${e://Field/Email}</div></div></div>",
+    "DataExportTag": "identity_card",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Account confirmed Is this you? Your answers are linked to ${e://Field/FirstName} ${e://Field/Last...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID2"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID3",
+   "SecondaryAttribute": "Submit your picks now?",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Submit your picks now?</h3>",
+    "DataExportTag": "opt_in",
+    "QuestionType": "MC",
+    "Selector": "SAVR",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Submit your picks now?",
+    "Choices": {
+     "1": {
+      "Display": "Yes, let me pick"
+     },
+     "2": {
+      "Display": "Not now"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 3,
+    "NextAnswerId": 1,
+    "QuestionID": "QID3"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID4",
+   "SecondaryAttribute": "Pick three Tick exactly 3 projects. You order them on the next page.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Pick three</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Tick <strong>exactly 3</strong> projects. You order them on the next page.</p>",
+    "DataExportTag": "picked_projects",
+    "QuestionType": "MC",
+    "Selector": "MACOL",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "NumColumns": 2
+    },
+    "QuestionDescription": "Pick three Tick exactly 3 projects. You order them on the next page.",
+    "Choices": {
+     "1": {
+      "Display": "Customer onboarding redesign"
+     },
+     "2": {
+      "Display": "Internal knowledge base"
+     },
+     "3": {
+      "Display": "Data quality dashboard"
+     },
+     "4": {
+      "Display": "Supplier review process"
+     },
+     "5": {
+      "Display": "Accessibility audit"
+     },
+     "6": {
+      "Display": "Mobile app prototype"
+     },
+     "7": {
+      "Display": "Energy use reduction plan"
+     },
+     "8": {
+      "Display": "Volunteering day"
+     },
+     "9": {
+      "Display": "Process automation pilot"
+     },
+     "10": {
+      "Display": "Market scan for a new service"
+     }
+    },
+    "ChoiceOrder": [
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8",
+     "9",
+     "10"
+    ],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "ON",
+      "Type": "CustomValidation",
+      "MinChoices": "3",
+      "MaxChoices": "3",
+      "CustomValidation": {
+       "Logic": {
+        "0": {
+         "0": {
+          "ChoiceLocator": "q://QID4/SelectedChoicesCount",
+          "Description": "<span class=\"ConjDesc\">If</span> <span class=\"QuestionDesc\">Pick three Tick exactly 3 projects. You order them on the next page.</span> <span class=\"LeftOpDesc\">Selected Count</span> <span class=\"OpDesc\">Is Equal to</span> <span class=\"RightOpDesc\"> 3 </span>",
+          "LeftOperand": "q://QID4/SelectedChoicesCount",
+          "LogicType": "Question",
+          "Operator": "EqualTo",
+          "QuestionID": "QID4",
+          "QuestionIDFromLocator": "QID4",
+          "QuestionIsInLoop": "no",
+          "RightOperand": "3",
+          "Type": "Expression"
+         },
+         "Type": "If"
+        },
+        "Type": "BooleanExpression"
+       },
+       "Message": {
+        "description": "Pick exactly 3 projects.",
+        "subMessageID": "VE_CUSTOM_VALIDATION_0"
+       }
+      }
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 11,
+    "NextAnswerId": 1,
+    "QuestionID": "QID4",
+    "QuestionJS": "Qualtrics.SurveyEngine.addOnReady(function () {\n  var MAX = 3;\n  var q = this.getQuestionContainer();\n  var inputs = q.querySelectorAll('input[type=\"checkbox\"]');\n  var status = document.createElement('p');\n  status.setAttribute('aria-live', 'polite');\n  status.style.margin = '8px 0';\n  q.appendChild(status);\n  function refresh() {\n    var picked = 0, i;\n    for (i = 0; i < inputs.length; i++) if (inputs[i].checked) picked++;\n    for (i = 0; i < inputs.length; i++) inputs[i].disabled = !inputs[i].checked && picked >= MAX;\n    status.textContent = picked < MAX\n      ? 'Picked ' + picked + ' of ' + MAX + '. Pick ' + (MAX - picked) + ' more.'\n      : 'Picked ' + MAX + ' of ' + MAX + '. Continue to order them.';\n  }\n  for (var i = 0; i < inputs.length; i++) inputs[i].addEventListener('change', refresh);\n  refresh();\n});",
+    "VariableNaming": {
+     "1": "P01",
+     "2": "P02",
+     "3": "P03",
+     "4": "P04",
+     "5": "P05",
+     "6": "P06",
+     "7": "P07",
+     "8": "P08",
+     "9": "P09",
+     "10": "P10"
+    },
+    "RecodeValues": {
+     "1": "1",
+     "2": "2",
+     "3": "3",
+     "4": "4",
+     "5": "5",
+     "6": "6",
+     "7": "7",
+     "8": "8",
+     "9": "9",
+     "10": "10"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID5",
+   "SecondaryAttribute": "Order your picks Drag to reorder. Top = first choice . To keep the order as shown, move at least ...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Order your picks</h3>\n\n<p style=\"font-family:Arial,sans-serif;color:#55606e\">Drag to reorder. <strong>Top = first choice</strong>.<br>\n<span style=\"font-size:12px\">To keep the order as shown, move at least one item to confirm it (you can put it back).</span></p>",
+    "DataExportTag": "project_order",
+    "QuestionType": "RO",
+    "Selector": "DND",
+    "SubSelector": "TX",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Order your picks Drag to reorder. Top = first choice . To keep the order as shown, move at least ...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "ON",
+      "ForceResponseType": "ON",
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID5",
+    "DynamicChoices": {
+     "DynamicType": "ChoiceGroup",
+     "Locator": "q://QID4/ChoiceGroup/SelectedChoices",
+     "Type": "Dynamic"
+    },
+    "DynamicChoicesData": [],
+    "Choices": [],
+    "RecodeValues": {
+     "x1": "1",
+     "x2": "2",
+     "x3": "3",
+     "x4": "4",
+     "x5": "5",
+     "x6": "6",
+     "x7": "7",
+     "x8": "8",
+     "x9": "9",
+     "x10": "10"
+    },
+    "VariableNaming": {
+     "x1": "P01 — Customer onboarding redesign",
+     "x2": "P02 — Internal knowledge base",
+     "x3": "P03 — Data quality dashboard",
+     "x4": "P04 — Supplier review process",
+     "x5": "P05 — Accessibility audit",
+     "x6": "P06 — Mobile app prototype",
+     "x7": "P07 — Energy use reduction plan",
+     "x8": "P08 — Volunteering day",
+     "x9": "P09 — Process automation pilot",
+     "x10": "P10 — Market scan for a new service"
+    }
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID6",
+   "SecondaryAttribute": "Notes (optional) Optional remarks for the organizers.",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<h3 style=\"font-family:Arial,sans-serif;font-size:20px;color:#1f2a37;margin:0 0 8px\">Notes (optional)</h3><p style=\"font-family:Arial,sans-serif;color:#55606e\">Optional remarks for the organizers.</p>",
+    "DataExportTag": "comment",
+    "QuestionType": "TE",
+    "Selector": "ML",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText",
+     "InputWidth": 680,
+     "InputHeight": 160
+    },
+    "QuestionDescription": "Notes (optional) Optional remarks for the organizers.",
+    "Validation": {
+     "Settings": {
+      "ForceResponse": "OFF",
+      "ForceResponseType": "OFF",
+      "Type": "None"
+     }
+    },
+    "GradingData": [],
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "SearchSource": {
+     "AllowFreeResponse": "false"
+    },
+    "QuestionID": "QID6",
+    "DefaultChoices": false
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "SQ",
+   "PrimaryAttribute": "QID7",
+   "SecondaryAttribute": "Not now No problem We'll note that you're skipping. Press Continue to save that. You can join nex...",
+   "TertiaryAttribute": null,
+   "Payload": {
+    "QuestionText": "<div class=\"card\" style=\"background:#fff;border:1px solid #d9e1e8;border-left:6px solid #0f766e;border-radius:6px;padding:20px 22px;font-family:Arial,Helvetica,sans-serif;color:#1f2a37;line-height:1.6\"><div style=\"font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#0f766e\">Not now</div><h2 style=\"font-size:23px;line-height:1.3;margin:6px 0 10px;color:#1f2a37\">No problem</h2><div style=\"font-size:16px;color:#55606e\">We'll note that you're skipping. Press <strong>Continue</strong> to save that. You can join next time.</div></div>",
+    "DataExportTag": "opt_out_note",
+    "QuestionType": "DB",
+    "Selector": "TB",
+    "DataVisibility": {
+     "Private": false,
+     "Hidden": false
+    },
+    "Configuration": {
+     "QuestionDescriptionOption": "UseText"
+    },
+    "QuestionDescription": "Not now No problem We'll note that you're skipping. Press Continue to save that. You can join nex...",
+    "ChoiceOrder": [],
+    "Validation": {
+     "Settings": {
+      "Type": "None"
+     }
+    },
+    "Language": [],
+    "NextChoiceId": 1,
+    "NextAnswerId": 1,
+    "QuestionID": "QID7"
+   }
+  },
+  {
+   "SurveyID": "SV_WyPEA3mmRzdBC2C",
+   "Element": "STAT",
+   "PrimaryAttribute": "Survey Statistics",
+   "SecondaryAttribute": null,
+   "TertiaryAttribute": null,
+   "Payload": {
+    "MobileCompatible": true,
+    "ID": "Survey Statistics"
+   }
+  }
+ ]
+}
